@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HKMA Projects Portal</title>
+  <script src="js/diagramly/architecture/ProjectStore.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: #252525;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      padding: 0 24px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .header-title .badge {
+      font-size: 11px;
+      font-weight: 500;
+      background: #4a9eff22;
+      color: #4a9eff;
+      border: 1px solid #4a9eff44;
+      border-radius: 4px;
+      padding: 2px 7px;
+    }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 7px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.15s, background 0.15s;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn:active { opacity: 0.7; }
+    .btn-primary { background: #4a9eff; color: #fff; }
+    .btn-secondary { background: rgba(255,255,255,0.08); color: #ddd; border: 1px solid rgba(255,255,255,0.12); }
+    .btn-danger  { background: #c0392b; color: #fff; }
+    .btn-success { background: #27ae60; color: #fff; }
+    .btn-info    { background: #1a6fa8; color: #fff; }
+    .btn-sm { padding: 4px 10px; font-size: 12px; }
+    .btn-icon { padding: 5px 8px; font-size: 14px; background: transparent; color: #aaa; border: 1px solid rgba(255,255,255,0.1); border-radius: 5px; }
+    .btn-icon:hover { color: #fff; border-color: rgba(255,255,255,0.25); }
+
+    /* ── Toolbar ── */
+    .toolbar {
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      background: #1e1e1e;
+    }
+    .search-input {
+      flex: 1;
+      min-width: 220px;
+      max-width: 380px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: #e0e0e0;
+      padding: 7px 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      outline: none;
+    }
+    .search-input::placeholder { color: #666; }
+    .search-input:focus { border-color: #4a9eff; }
+    .filter-select {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      color: #e0e0e0;
+      padding: 7px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      outline: none;
+      cursor: pointer;
+    }
+    .filter-select:focus { border-color: #4a9eff; }
+    .filter-select option { background: #2d2d2d; color: #e0e0e0; }
+    .count-label { font-size: 12px; color: #777; margin-left: auto; }
+
+    /* ── Grid ── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 16px;
+      padding: 20px 24px;
+    }
+
+    /* ── Card ── */
+    .card {
+      background: #252525;
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .card:hover {
+      border-color: rgba(74,158,255,0.4);
+      box-shadow: 0 2px 12px rgba(0,0,0,0.3);
+    }
+    .card-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .card-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #fff;
+      line-height: 1.3;
+    }
+    .card-code {
+      font-size: 11px;
+      font-weight: 600;
+      font-family: monospace;
+      background: rgba(255,255,255,0.08);
+      color: #aaa;
+      padding: 2px 6px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+    .card-meta {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .badge-team {
+      font-size: 11px;
+      background: #2a3a50;
+      color: #4a9eff;
+      border: 1px solid #4a9eff33;
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-weight: 600;
+    }
+    .badge-status {
+      font-size: 11px;
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-weight: 600;
+    }
+    .badge-status.active   { background: #1a3d1a; color: #4caf50; border: 1px solid #4caf5044; }
+    .badge-status.on-hold  { background: #3d2e0a; color: #ffb74d; border: 1px solid #ffb74d44; }
+    .badge-status.archived { background: #333; color: #888; border: 1px solid #44444466; }
+
+    .card-description {
+      font-size: 12px;
+      color: #999;
+      line-height: 1.5;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .card-members {
+      font-size: 11px;
+      color: #777;
+    }
+    .card-members span { color: #aaa; }
+
+    .card-linked {
+      font-size: 12px;
+      margin-top: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .card-linked .linked-row {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      background: rgba(39,174,96,0.08);
+      border: 1px solid rgba(39,174,96,0.2);
+      border-radius: 6px;
+      padding: 7px 10px;
+    }
+    .card-linked .linked-info {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+    .card-linked .linked-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .card-linked .linked-label { font-weight: 600; white-space: nowrap; flex-shrink: 0; }
+    .card-linked .linked-file  { color: #aef; font-family: monospace; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .card-linked .linked-date  { color: #77c; font-size: 10px; white-space: nowrap; flex-shrink: 0; }
+    .card-linked .linked-info .btn-danger { padding: 1px 7px; font-size: 12px; margin-left: auto; flex-shrink: 0; }
+
+    .card-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 4px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      padding-top: 10px;
+    }
+    .card-actions-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .spacer { flex: 1; }
+
+    /* ── Empty state ── */
+    .empty-state {
+      grid-column: 1 / -1;
+      text-align: center;
+      padding: 60px 20px;
+      color: #555;
+    }
+    .empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-state p { font-size: 14px; }
+
+    /* ── Modal overlay ── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 20px;
+    }
+    .modal-overlay.hidden { display: none; }
+
+    .modal {
+      background: #252525;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 12px;
+      width: 100%;
+      max-width: 540px;
+      max-height: 90vh;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+    .modal-header {
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .modal-title { font-size: 15px; font-weight: 600; color: #fff; }
+    .modal-close {
+      background: none;
+      border: none;
+      color: #888;
+      font-size: 20px;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0 4px;
+    }
+    .modal-close:hover { color: #fff; }
+    .modal-body { padding: 18px 20px; display: flex; flex-direction: column; gap: 14px; }
+    .modal-footer { padding: 12px 20px 18px; display: flex; gap: 8px; justify-content: flex-end; }
+
+    /* ── Form fields ── */
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    .field label { font-size: 12px; font-weight: 600; color: #aaa; text-transform: uppercase; letter-spacing: 0.5px; }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    input[type=text], textarea, select {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.14);
+      color: #e0e0e0;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      width: 100%;
+    }
+    input[type=text]:focus, textarea:focus, select:focus { border-color: #4a9eff; }
+    select option { background: #2d2d2d; color: #e0e0e0; }
+    textarea { resize: vertical; min-height: 70px; }
+    .required-star { color: #f88; }
+
+    /* ── Toast ── */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 2000;
+    }
+    .toast {
+      background: #333;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 8px;
+      padding: 10px 16px;
+      font-size: 13px;
+      color: #e0e0e0;
+      animation: slideIn 0.2s ease;
+      max-width: 300px;
+    }
+    .toast.success { border-left: 3px solid #27ae60; }
+    .toast.error   { border-left: 3px solid #c0392b; }
+    .toast.info    { border-left: 3px solid #4a9eff; }
+    @keyframes slideIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ── Confirm dialog ── */
+    .confirm-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1500;
+    }
+    .confirm-overlay.hidden { display: none; }
+    .confirm-box {
+      background: #2d2d2d;
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 10px;
+      padding: 24px;
+      width: 360px;
+      text-align: center;
+    }
+    .confirm-box p { font-size: 14px; color: #ccc; margin-bottom: 20px; line-height: 1.5; }
+    .confirm-box .actions { display: flex; gap: 10px; justify-content: center; }
+  </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div class="header-title">
+    <a href="index.html" target="_blank" id="backToCanvas" title="Open draw.io canvas in a new tab" style="color:#4a9eff;text-decoration:none;font-size:13px;font-weight:500;display:flex;align-items:center;gap:5px;padding:4px 10px;border:1px solid #4a9eff44;border-radius:5px;background:#4a9eff11;">&#8592; draw.io Canvas</a>
+    <span>HKMA Projects Portal</span>
+    <span class="badge">BTG Admin</span>
+  </div>
+  <button class="btn btn-primary" id="newProjectBtn">+ New Project</button>
+</div>
+
+<!-- Toolbar -->
+<div class="toolbar">
+  <input class="search-input" type="text" id="searchInput" placeholder="Search projects..." />
+  <select class="filter-select" id="statusFilter">
+    <option value="">All Statuses</option>
+    <option value="Active">Active</option>
+    <option value="On Hold">On Hold</option>
+    <option value="Archived">Archived</option>
+  </select>
+  <select class="filter-select" id="teamFilter">
+    <option value="">All Teams</option>
+    <option value="AS1">AS1</option>
+    <option value="AS2">AS2</option>
+    <option value="ITIS">ITIS</option>
+    <option value="ITDP">ITDP</option>
+    <option value="ITPSO">ITPSO</option>
+    <option value="BTG">BTG</option>
+    <option value="BSA">BSA</option>
+    <option value="ITS">ITS</option>
+    <option value="Other">Other</option>
+  </select>
+  <span class="count-label" id="countLabel"></span>
+</div>
+
+<!-- Grid -->
+<div class="grid" id="projectGrid"></div>
+
+<!-- Add/Edit Modal -->
+<div class="modal-overlay hidden" id="modalOverlay">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal-header">
+      <span class="modal-title" id="modalTitle">New Project</span>
+      <button class="modal-close" id="modalClose" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="editId" />
+      <div class="field">
+        <label>Project Name <span class="required-star">*</span></label>
+        <input type="text" id="fieldName" placeholder="e.g. CSP Payment Gateway" />
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Project Code</label>
+          <input type="text" id="fieldCode" placeholder="e.g. CSP" />
+        </div>
+        <div class="field">
+          <label>Owning Team</label>
+          <select id="fieldTeam">
+            <option value="">Select team</option>
+            <option value="AS1">AS1</option>
+            <option value="AS2">AS2</option>
+            <option value="ITIS">ITIS</option>
+            <option value="ITDP">ITDP</option>
+            <option value="ITPSO">ITPSO</option>
+            <option value="BTG">BTG</option>
+            <option value="BSA">BSA</option>
+            <option value="ITS">ITS</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Status</label>
+          <select id="fieldStatus">
+            <option value="Active">Active</option>
+            <option value="On Hold">On Hold</option>
+            <option value="Archived">Archived</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>People Assigned</label>
+          <input type="text" id="fieldMembers" placeholder="e.g. Ryan Chan, Raymond So" />
+        </div>
+      </div>
+      <div class="field">
+        <label>Description</label>
+        <textarea id="fieldDescription" placeholder="Brief description of the project..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" id="modalCancelBtn">Cancel</button>
+      <button class="btn btn-primary" id="modalSaveBtn">Save Project</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Delete Dialog -->
+<div class="confirm-overlay hidden" id="confirmOverlay">
+  <div class="confirm-box">
+    <p id="confirmMessage">Are you sure you want to delete this project?</p>
+    <div class="actions">
+      <button class="btn btn-secondary" id="confirmCancelBtn">Cancel</button>
+      <button class="btn btn-danger" id="confirmOkBtn">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div class="toast-container" id="toastContainer"></div>
+
+<script>
+(function() {
+  'use strict';
+
+  var store = window.HKMAProjectStore;
+
+  // ── Toast ──────────────────────────────────────────────
+  function showToast(msg, type) {
+    type = type || 'info';
+    var container = document.getElementById('toastContainer');
+    var el = document.createElement('div');
+    el.className = 'toast ' + type;
+    el.textContent = msg;
+    container.appendChild(el);
+    setTimeout(function() {
+      if (el.parentNode) el.parentNode.removeChild(el);
+    }, 3500);
+  }
+
+  // ── Confirm dialog ─────────────────────────────────────
+  var confirmCallback = null;
+  function showConfirm(message, onOk) {
+    document.getElementById('confirmMessage').textContent = message;
+    confirmCallback = onOk;
+    document.getElementById('confirmOverlay').classList.remove('hidden');
+  }
+  document.getElementById('confirmCancelBtn').addEventListener('click', function() {
+    document.getElementById('confirmOverlay').classList.add('hidden');
+    confirmCallback = null;
+  });
+  document.getElementById('confirmOkBtn').addEventListener('click', function() {
+    document.getElementById('confirmOverlay').classList.add('hidden');
+    if (confirmCallback) { confirmCallback(); confirmCallback = null; }
+  });
+
+  // ── Status badge class ─────────────────────────────────
+  function statusClass(status) {
+    if (status === 'Active') return 'active';
+    if (status === 'On Hold') return 'on-hold';
+    return 'archived';
+  }
+
+  // ── Format date ────────────────────────────────────────
+  function fmtDate(iso) {
+    if (!iso) return '';
+    try {
+      var d = new Date(iso);
+      return d.toLocaleDateString(undefined, { year:'numeric', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+    } catch(e) { return iso; }
+  }
+
+  // ── Download blob ──────────────────────────────────────
+  function downloadJson(data, filename) {
+    var json = JSON.stringify(data, null, 2);
+    var blob = new Blob([json], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function() {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 100);
+  }
+
+  function downloadDrawio(xmlString, filename) {
+    var blob = new Blob([xmlString], { type: 'application/xml' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function() {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 100);
+  }
+
+  // ── Render grid ────────────────────────────────────────
+  function render() {
+    var search = document.getElementById('searchInput').value.toLowerCase().trim();
+    var statusF = document.getElementById('statusFilter').value;
+    var teamF   = document.getElementById('teamFilter').value;
+
+    var projects = store.getAll().filter(function(p) {
+      if (statusF && p.status !== statusF) return false;
+      if (teamF   && p.team   !== teamF)   return false;
+      if (search) {
+        var haystack = [p.name, p.code, p.team, p.members, p.description].join(' ').toLowerCase();
+        if (haystack.indexOf(search) === -1) return false;
+      }
+      return true;
+    });
+
+    // Sort: Active first, then On Hold, then Archived; within same status, newest first
+    var statusOrder = { 'Active': 0, 'On Hold': 1, 'Archived': 2 };
+    projects.sort(function(a, b) {
+      var so = (statusOrder[a.status] || 0) - (statusOrder[b.status] || 0);
+      if (so !== 0) return so;
+      return (b.createdAt || '').localeCompare(a.createdAt || '');
+    });
+
+    var countLabel = document.getElementById('countLabel');
+    var total = store.getAll().length;
+    countLabel.textContent = projects.length === total
+      ? total + ' project' + (total !== 1 ? 's' : '')
+      : projects.length + ' of ' + total + ' projects';
+
+    var grid = document.getElementById('projectGrid');
+    grid.innerHTML = '';
+
+    if (projects.length === 0) {
+      grid.innerHTML =
+        '<div class="empty-state">' +
+        '<div class="icon">&#128193;</div>' +
+        '<p>' + (search || statusF || teamF ? 'No projects match your filters.' : 'No projects yet. Click &ldquo;+ New Project&rdquo; to create one.') + '</p>' +
+        '</div>';
+      return;
+    }
+
+    projects.forEach(function(p) {
+      var card = document.createElement('div');
+      card.className = 'card';
+      card.setAttribute('data-id', p.id);
+
+      var headerHtml =
+        '<div class="card-header">' +
+        '<span class="card-title">' + esc(p.name) + '</span>' +
+        (p.code ? '<span class="card-code">' + esc(p.code) + '</span>' : '') +
+        '</div>';
+
+      var metaHtml =
+        '<div class="card-meta">' +
+        (p.team ? '<span class="badge-team">' + esc(p.team) + '</span>' : '') +
+        '<span class="badge-status ' + statusClass(p.status) + '">' + esc(p.status || 'Active') + '</span>' +
+        '</div>';
+
+      var descHtml = p.description
+        ? '<div class="card-description">' + esc(p.description) + '</div>'
+        : '';
+
+      var membersHtml = p.members
+        ? '<div class="card-members">People: <span>' + esc(p.members) + '</span></div>'
+        : '';
+
+      var linkedHtml = '<div class="card-linked">';
+      if (p.diagramXml) {
+        linkedHtml +=
+          '<div class="linked-row">' +
+            '<div class="linked-info">' +
+              '<span class="linked-label">&#128196; Diagram:</span>' +
+              '<span class="linked-file">' + esc(p.diagramFilename || 'diagram.drawio') + '</span>' +
+              '<span class="linked-date">' + fmtDate(p.linkedAt) + '</span>' +
+            '</div>' +
+            '<div class="linked-actions">' +
+              '<button class="btn btn-info btn-sm" data-action="open-diagram" data-id="' + p.id + '">&#9654; Open in Canvas</button>' +
+              '<button class="btn btn-secondary btn-sm" data-action="dl-diagram" data-id="' + p.id + '">&#8681; Download .drawio</button>' +
+              '<button class="btn btn-danger btn-sm" data-action="unlink-diagram" data-id="' + p.id + '" title="Unlink diagram">&#10005;</button>' +
+            
+            '</div>' +
+          '</div>';
+      }
+      if (p.firewallJson) {
+        linkedHtml +=
+          '<div class="linked-row">' +
+            '<div class="linked-info">' +
+              '<span class="linked-label">&#128220; Firewall:</span>' +
+              '<span class="linked-file">' + esc(p.firewallFilename || 'firewall.json') + '</span>' +
+              '<span class="linked-date">' + fmtDate(p.firewallLinkedAt || p.linkedAt) + '</span>' +
+            '</div>' +
+            '<div class="linked-actions">' +
+              '<button class="btn btn-info btn-sm" data-action="view-firewall" data-id="' + p.id + '">&#9654; View JSON</button>' +
+              '<button class="btn btn-secondary btn-sm" data-action="dl-firewall" data-id="' + p.id + '">&#8681; Download .json</button>' +
+              '<button class="btn btn-danger btn-sm" data-action="unlink-firewall" data-id="' + p.id + '" title="Unlink firewall JSON">&#10005;</button>' +
+            '</div>' +
+          '</div>';
+      }
+      linkedHtml += '</div>';
+
+      var actionsHtml =
+        '<div class="card-actions">' +
+          '<div class="card-actions-row">' +
+            '<button class="btn btn-success btn-sm" data-action="link-diagram" data-id="' + p.id + '" title="Upload a .drawio file to link to this project">&#128279; Link Diagram</button>' +
+            '<button class="btn btn-success btn-sm" data-action="link-firewall" data-id="' + p.id + '" title="Upload a firewall-requests .json file">&#128220; Link Firewall JSON</button>' +
+          '</div>' +
+          '<div class="card-actions-row">' +
+            '<button class="btn btn-secondary btn-sm" data-action="edit" data-id="' + p.id + '">Edit</button>' +
+            '<button class="btn btn-danger btn-sm" data-action="delete" data-id="' + p.id + '">Delete</button>' +
+          '</div>' +
+        '</div>';
+
+      card.innerHTML = headerHtml + metaHtml + descHtml + membersHtml + linkedHtml + actionsHtml;
+      grid.appendChild(card);
+    });
+  }
+
+  // ── Escape HTML ────────────────────────────────────────
+  function esc(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  // ── Delegated grid click handler ───────────────────────
+  document.getElementById('projectGrid').addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    var action = btn.getAttribute('data-action');
+    var id = btn.getAttribute('data-id');
+
+    if (action === 'edit') {
+      openEditModal(id);
+    } else if (action === 'delete') {
+      showConfirm('Delete this project? This cannot be undone.', function() {
+        store.delete(id);
+        render();
+        showToast('Project deleted.', 'info');
+      });
+    } else if (action === 'link-diagram') {
+      pickFile(id, '.drawio,application/xml', function(filename, content) {
+        var p = store.getById(id);
+        if (!p) return;
+        p.diagramXml      = content;
+        p.diagramFilename = filename;
+        p.linkedAt        = new Date().toISOString();
+        store.save(p);
+        render();
+        showToast('Diagram "' + filename + '" linked to "' + p.name + '".', 'success');
+      });
+    } else if (action === 'link-firewall') {
+      pickFile(id, '.json,application/json', function(filename, content) {
+        var parsed;
+        try { parsed = JSON.parse(content); }
+        catch (e) {
+          showToast('Invalid JSON file: ' + e.message, 'error');
+          return;
+        }
+        var p = store.getById(id);
+        if (!p) return;
+        p.firewallJson      = parsed;
+        p.firewallFilename  = filename;
+        p.firewallLinkedAt  = new Date().toISOString();
+        if (!p.linkedAt) p.linkedAt = p.firewallLinkedAt;
+        store.save(p);
+        render();
+        showToast('Firewall rules "' + filename + '" linked to "' + p.name + '".', 'success');
+      });
+    } else if (action === 'dl-diagram') {
+      var p = store.getById(id);
+      if (p && p.diagramXml) downloadDrawio(p.diagramXml, p.diagramFilename || (p.code || 'diagram') + '-diagram.drawio');
+    } else if (action === 'dl-firewall') {
+      var p = store.getById(id);
+      if (p && p.firewallJson) downloadJson(p.firewallJson, p.firewallFilename || (p.code || 'firewall') + '-firewall-requests.json');
+    } else if (action === 'unlink-diagram') {
+      showConfirm('Remove the linked diagram from this project?', function() {
+        var p = store.getById(id);
+        if (!p) return;
+        p.diagramXml      = null;
+        p.diagramFilename = null;
+        if (!p.firewallJson) p.linkedAt = null;
+        store.save(p);
+        render();
+        showToast('Diagram unlinked.', 'info');
+      });
+    } else if (action === 'unlink-firewall') {
+      showConfirm('Remove the linked firewall JSON from this project?', function() {
+        var p = store.getById(id);
+        if (!p) return;
+        p.firewallJson     = null;
+        p.firewallFilename = null;
+        p.firewallLinkedAt = null;
+        if (!p.diagramXml) p.linkedAt = null;
+        store.save(p);
+        render();
+        showToast('Firewall rules unlinked.', 'info');
+      });
+    } else if (action === 'open-diagram') {
+      var p = store.getById(id);
+      if (p && p.diagramXml) openDiagramInCanvas(p);
+    } else if (action === 'view-firewall') {
+      var p = store.getById(id);
+      if (p && p.firewallJson) viewFirewallInTab(p);
+    }
+  });
+
+  // ── File picker helper ─────────────────────────────────
+  // Opens a hidden <input type="file"> with the given accept string,
+  // reads the selected file as text, and calls back with (filename, content).
+  function pickFile(projectId, accept, callback) {
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.accept = accept;
+    input.style.display = 'none';
+    document.body.appendChild(input);
+
+    input.addEventListener('change', function() {
+      var file = input.files && input.files[0];
+      document.body.removeChild(input);
+      if (!file) return;
+
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        callback(file.name, e.target.result);
+      };
+      reader.onerror = function() {
+        showToast('Could not read file.', 'error');
+      };
+      reader.readAsText(file);
+    });
+
+    // If user cancels the picker, clean up
+    input.addEventListener('cancel', function() {
+      document.body.removeChild(input);
+    });
+
+    input.click();
+  }
+
+  // ── Open diagram XML in draw.io canvas (new tab) ───────
+  // Stores the XML in localStorage under a temp draft key, then opens
+  // index.html?openDraft=<key> in a new tab. The canvas checks for this
+  // param on startup and loads the draft automatically.
+  function openDiagramInCanvas(p) {
+    var draftKey = 'hkma.opendraft.' + Date.now();
+    try {
+      localStorage.setItem(draftKey, p.diagramXml);
+    } catch (e) {
+      showToast('Could not write draft to localStorage: ' + e.message, 'error');
+      return;
+    }
+    var url = 'index.html?openDraft=' + encodeURIComponent(draftKey);
+    window.open(url, '_blank');
+    showToast('Opening diagram in draw.io canvas…', 'info');
+  }
+
+  // ── View firewall JSON in a new browser tab ────────────
+  function viewFirewallInTab(p) {
+    var json = JSON.stringify(p.firewallJson, null, 2);
+    var blob = new Blob([json], { type: 'application/json' });
+    var url  = URL.createObjectURL(blob);
+    var tab  = window.open(url, '_blank');
+    // Revoke after a short delay so the tab has time to load
+    if (tab) {
+      setTimeout(function() { URL.revokeObjectURL(url); }, 10000);
+    } else {
+      // Popup blocked — fall back to a data URI
+      var dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(json);
+      window.open(dataUri, '_blank');
+      URL.revokeObjectURL(url);
+    }
+  }
+
+
+  // ── Modal helpers ──────────────────────────────────────
+  function openModal(title) {
+    document.getElementById('modalTitle').textContent = title;
+    document.getElementById('modalOverlay').classList.remove('hidden');
+    document.getElementById('fieldName').focus();
+  }
+
+  function closeModal() {
+    document.getElementById('modalOverlay').classList.add('hidden');
+    clearModalFields();
+  }
+
+  function clearModalFields() {
+    document.getElementById('editId').value = '';
+    document.getElementById('fieldName').value = '';
+    document.getElementById('fieldCode').value = '';
+    document.getElementById('fieldTeam').value = '';
+    document.getElementById('fieldStatus').value = 'Active';
+    document.getElementById('fieldMembers').value = '';
+    document.getElementById('fieldDescription').value = '';
+  }
+
+  function openNewModal() {
+    clearModalFields();
+    openModal('New Project');
+  }
+
+  function openEditModal(id) {
+    var p = store.getById(id);
+    if (!p) return;
+    document.getElementById('editId').value = p.id;
+    document.getElementById('fieldName').value = p.name || '';
+    document.getElementById('fieldCode').value = p.code || '';
+    document.getElementById('fieldTeam').value = p.team || '';
+    document.getElementById('fieldStatus').value = p.status || 'Active';
+    document.getElementById('fieldMembers').value = p.members || '';
+    document.getElementById('fieldDescription').value = p.description || '';
+    openModal('Edit Project');
+  }
+
+  function saveModal() {
+    var name = document.getElementById('fieldName').value.trim();
+    if (!name) {
+      showToast('Project name is required.', 'error');
+      document.getElementById('fieldName').focus();
+      return;
+    }
+
+    var id = document.getElementById('editId').value;
+    var existing = id ? (store.getById(id) || {}) : {};
+
+    var project = {
+      id:          id || null,
+      name:        name,
+      code:        document.getElementById('fieldCode').value.trim(),
+      team:        document.getElementById('fieldTeam').value,
+      status:      document.getElementById('fieldStatus').value,
+      members:     document.getElementById('fieldMembers').value.trim(),
+      description: document.getElementById('fieldDescription').value.trim(),
+      diagramXml:        existing.diagramXml        || null,
+      diagramFilename:   existing.diagramFilename   || null,
+      firewallJson:      existing.firewallJson      || null,
+      firewallFilename:  existing.firewallFilename  || null,
+      firewallLinkedAt:  existing.firewallLinkedAt  || null,
+      linkedAt:          existing.linkedAt          || null,
+      createdAt:         existing.createdAt         || null
+    };
+
+    store.save(project);
+    closeModal();
+    render();
+    showToast(id ? 'Project updated.' : 'Project created.', 'success');
+  }
+
+  // ── Modal events ───────────────────────────────────────
+  document.getElementById('newProjectBtn').addEventListener('click', openNewModal);
+  document.getElementById('modalClose').addEventListener('click', closeModal);
+  document.getElementById('modalCancelBtn').addEventListener('click', closeModal);
+  document.getElementById('modalSaveBtn').addEventListener('click', saveModal);
+
+  // Close on overlay click
+  document.getElementById('modalOverlay').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+  });
+
+  // Enter key saves in modal
+  document.getElementById('modalOverlay').addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeModal();
+    if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') saveModal();
+  });
+
+  // ── Filter events ──────────────────────────────────────
+  document.getElementById('searchInput').addEventListener('input', render);
+  document.getElementById('statusFilter').addEventListener('change', render);
+  document.getElementById('teamFilter').addEventListener('change', render);
+
+  // ── Initial render ─────────────────────────────────────
+  render();
+
+})();
+</script>
+</body>
+</html>

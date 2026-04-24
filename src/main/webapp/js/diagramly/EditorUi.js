@@ -2215,6 +2215,8 @@
 				// Scrolls to current page
 				this.scrollToPage();
 			}
+
+		this.refreshArchitectureSchema();
 			
 			if (urlParams['layer-ids'] != null)
 			{
@@ -12603,6 +12605,34 @@
 		};
 
 		editorUiInit.apply(this, arguments);
+		this.refreshArchitectureSchema();
+
+		var architectureEventName = (window.ArchitectureValidationEngine != null) ?
+			window.ArchitectureValidationEngine.eventName : 'architectureValidationInvalid';
+		var architectureErrorVisible = false;
+		graph.addListener(architectureEventName, mxUtils.bind(this, function(sender, evt)
+		{
+			var violations = evt.getProperty('violations') || [];
+			
+			if (violations.length > 0 && !architectureErrorVisible)
+			{
+				var messages = [];
+				
+				for (var i = 0; i < violations.length; i++)
+				{
+					messages.push((violations[i].message != null && violations[i].message.length > 0) ?
+						violations[i].message : ('Rule "' + violations[i].id + '" violated.'));
+				}
+				
+				architectureErrorVisible = true;
+				this.showError(mxResources.get('error'), messages.join('\n'), mxResources.get('ok'),
+					function()
+					{
+						architectureErrorVisible = false;
+					});
+			}
+		}));
+
 		this.editor.graph.addSvgShadow(graph.view.canvas.ownerSVGElement, null, true);
 		
 		if (this.menus != null)

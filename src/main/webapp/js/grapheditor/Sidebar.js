@@ -2935,6 +2935,26 @@ Sidebar.prototype.createDropHandler = function(cells, allowSplit, allowCellsInse
 
 				if (target != null && !validDropTarget)
 				{
+					if (graph.architectureSchema != null &&
+						graph.getAttributeForCell(target, 'archZoneId', null) != null)
+					{
+						for (var idx = 0; idx < cells.length; idx++)
+						{
+							if (graph.model.isVertex(cells[idx]))
+							{
+								var dropValidation = graph.validateArchitectureContainment(cells[idx], target);
+								
+								if (dropValidation != null && !dropValidation.allowed)
+								{
+									this.editorUi.showError(mxResources.get('error'),
+										dropValidation.message || mxResources.get('invalidOrMissingFile'),
+										mxResources.get('ok'));
+									return;
+								}
+							}
+						}
+					}
+
 					target = null;
 				}
 				
@@ -2967,20 +2987,33 @@ Sidebar.prototype.createDropHandler = function(cells, allowSplit, allowCellsInse
 							if (graph.model.isVertex(sourceCell) && select.length == 1 &&
 								graph.model.isVertex(select[0]))
 							{
-								var edge = graph.insertEdge(graph.model.getParent(sourceCell),
-									null, '', sourceCell, select[0], graph.createCurrentEdgeStyle());
-								graph.applyNewEdgeStyle(sourceCell, [edge]);
-								select.push(edge);
-
-								if (graph.connectionHandler.insertBeforeSource)
+								var edgeValidation = graph.validateArchitectureEdge(sourceCell, select[0]);
+								
+								if (edgeValidation != null && !edgeValidation.allowed)
 								{
-									graph.insertEdgeBeforeCell(edge, sourceCell);
+									this.editorUi.showError(mxResources.get('error'),
+										edgeValidation.message || mxResources.get('invalidConnection'),
+										mxResources.get('ok'));
+									graph.removeCells(select);
+									select = [];
+								}
+								else
+								{
+									var edge = graph.insertEdge(graph.model.getParent(sourceCell),
+										null, '', sourceCell, select[0], graph.createCurrentEdgeStyle());
+									graph.applyNewEdgeStyle(sourceCell, [edge]);
+									select.push(edge);
+	
+									if (graph.connectionHandler.insertBeforeSource)
+									{
+										graph.insertEdgeBeforeCell(edge, sourceCell);
+									}
 								}
 							}
 						}
 						
 						// Executes parent layout hooks for position/order
-						if (graph.layoutManager != null)
+						if (graph.layoutManager != null && select != null)
 						{
 							var layout = graph.layoutManager.getLayout(target);
 							
@@ -3003,7 +3036,7 @@ Sidebar.prototype.createDropHandler = function(cells, allowSplit, allowCellsInse
 							graph.fireEvent(new mxEventObject('cellsInserted', 'cells', select));
 						}
 
-						for (var i = 0; i < select.length; i++)
+						for (var i = 0; select != null && i < select.length; i++)
 						{
 							if (graph.model.isVertex(select[i]) &&
 								graph.isAutoSizeCell(select[i]))
@@ -4633,7 +4666,12 @@ Sidebar.prototype.removePalette = function(id)
 		
 		for (var i = 0; i < elts.length; i++)
 		{
-			this.container.removeChild(elts[i]);
+			var elt = elts[i];
+			
+			if (elt != null && elt.parentNode != null)
+			{
+				elt.parentNode.removeChild(elt);
+			}
 		}
 		
 		return true;

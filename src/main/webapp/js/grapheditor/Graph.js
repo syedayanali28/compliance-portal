@@ -329,6 +329,8 @@ Graph = function(container, model, renderHint, stylesheet, themes, standalone)
 	this.currentEdgeStyle = mxUtils.clone(this.defaultEdgeStyle);
 	this.currentVertexStyle = mxUtils.clone(this.defaultVertexStyle);
 	this.standalone = (standalone != null) ? standalone : false;
+	this.architectureSchema = null;
+	this.architectureLastViolations = null;
 
 	// Sets the base domain URL and domain path URL for relative links.
 	var b = this.baseUrl;
@@ -1016,6 +1018,16 @@ Graph = function(container, model, renderHint, stylesheet, themes, standalone)
 		// Applies newEdgeStyle
 		this.connectionHandler.insertEdge = function(parent, id, value, source, target, style)
 		{
+			if (source != null && target != null)
+			{
+				var edgeValidation = this.graph.validateArchitectureEdge(source, target);
+				
+				if (edgeValidation != null && !edgeValidation.allowed)
+				{
+					return null;
+				}
+			}
+			
 			var edge = mxConnectionHandler.prototype.insertEdge.apply(this, arguments);
 
 			if (source != null)
@@ -1024,6 +1036,26 @@ Graph = function(container, model, renderHint, stylesheet, themes, standalone)
 			}
 			
 			return edge
+		};
+
+		// Integrates schema-driven edge validation into mxGraph validation flow
+		var graphGetEdgeValidationError = this.getEdgeValidationError;
+		this.getEdgeValidationError = function(edge, source, target)
+		{
+			var err = graphGetEdgeValidationError.apply(this, arguments);
+			
+			if (err == null)
+			{
+				var result = this.validateArchitectureEdge(source, target);
+				
+				if (result != null && !result.allowed)
+				{
+					err = (result.message != null && result.message.length > 0) ?
+						result.message : mxResources.get('invalidConnection');
+				}
+			}
+			
+			return err;
 		};
 
 		// Creates rubberband selection and associates with graph instance
@@ -12288,11 +12320,30 @@ if (typeof mxVertexHandler !== 'undefined')
 				rows = rows && this.isTableRow(cells[i]);
 			}
 
-			return !this.isCellLocked(cell) && (this.isTargetShape(cell, cells, evt) ||
+			var valid = !this.isCellLocked(cell) && (this.isTargetShape(cell, cells, evt) ||
 				((mxUtils.getValue(style, 'part', '0') != '1' || this.isContainer(cell)) &&
 				mxUtils.getValue(style, 'dropTarget', '1') != '0' && (mxGraph.prototype.
 				isValidDropTarget.apply(this, arguments) || this.isContainer(cell)) &&
 				!this.isTableRow(cell) && (!this.isTable(cell) || rows || tables)));
+
+			if (valid && this.architectureSchema != null && this.getAttributeForCell(cell, 'archZoneId', null) != null)
+			{
+				for (var j = 0; j < cells.length; j++)
+				{
+					if (this.model.isVertex(cells[j]))
+					{
+						var containment = this.validateArchitectureContainment(cells[j], cell);
+						
+						if (containment != null && !containment.allowed)
+						{
+							valid = false;
+							break;
+						}
+					}
+				}
+			}
+			
+			return valid;
 		};
 	
 		/**
@@ -13128,6 +13179,71 @@ if (typeof mxVertexHandler !== 'undefined')
 			
 			this.model.setValue(cell, value);
 		};
+
+/**
+ * Sets the active architecture schema for runtime validation.
+ */
+Graph.prototype.setArchitectureSchema = function(schema)
+{
+	this.architectureSchema = schema;
+};
+
+/**
+ * Returns true if the cell has architecture metadata.
+ */
+Graph.prototype.isArchitectureCell = function(cell)
+{
+	return cell != null && (this.getAttributeForCell(cell, 'archComponentId', null) != null ||
+		this.getAttributeForCell(cell, 'archZoneId', null) != null);
+};
+
+/**
+ * Validates component placement inside a container.
+ */
+Graph.prototype.validateArchitectureContainment = function(componentCell, containerCell)
+{
+	if (window.ArchitectureValidationEngine == null || this.architectureSchema == null ||
+		componentCell == null || containerCell == null)
+	{
+		return {allowed: true, violations: []};
+	}
+
+	if (this.getAttributeForCell(containerCell, 'archZoneId', null) == null)
+	{
+		return {allowed: true, violations: []};
+	}
+
+	var result = window.ArchitectureValidationEngine.validateContainment(
+		this, this.architectureSchema, componentCell, containerCell);
+
+	this.architectureLastViolations = (result != null && result.violations != null) ? result.violations : null;
+
+	return result;
+};
+
+/**
+ * Validates source and target before creating an edge.
+ */
+Graph.prototype.validateArchitectureEdge = function(sourceCell, targetCell)
+{
+	if (window.ArchitectureValidationEngine == null || this.architectureSchema == null ||
+		sourceCell == null || targetCell == null)
+	{
+		return {allowed: true, violations: []};
+	}
+
+	if (!this.isArchitectureCell(sourceCell) || !this.isArchitectureCell(targetCell))
+	{
+		return {allowed: true, violations: []};
+	}
+
+	var result = window.ArchitectureValidationEngine.validateEdge(
+		this, this.architectureSchema, sourceCell, targetCell);
+
+	this.architectureLastViolations = (result != null && result.violations != null) ? result.violations : null;
+
+	return result;
+};
 
 		/**
 		 * 

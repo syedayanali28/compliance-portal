@@ -1050,6 +1050,11 @@
 				  'Palm Treo', 'Signaltower off', 'Signaltower on']);
 		this.setCurrentSearchEntryLibrary();
 
+		if (this.addArchitecturePalette != null)
+		{
+			this.addArchitecturePalette();
+		}
+
 		this.addFlowchartPalette();
 		this.addActiveDirectoryPalette();
 		this.addAndroidPalette();

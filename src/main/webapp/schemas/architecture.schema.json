@@ -1,0 +1,596 @@
+{
+  "meta": {
+    "id": "com.company.architecture.schema",
+    "version": "1.0.0",
+    "updatedAt": "2026-04-16T00:00:00Z"
+  },
+  "policies": {
+    "edge": {
+      "default": "allow"
+    },
+    "containment": {
+      "default": "allow"
+    },
+    "precedence": {
+      "denyOverridesAllow": true
+    }
+  },
+  "zones": [
+    {
+      "id": "oa-baremetal",
+      "name": "OA Network - Baremetal",
+      "description": "On-premises baremetal workloads and systems.",
+      "examples": [
+        "Physical compute clusters",
+        "Baremetal databases",
+        "Legacy appliances"
+      ],
+      "tags": [
+        "oa",
+        "on-prem",
+        "baremetal"
+      ],
+      "styleRef": "zone.oa-baremetal",
+      "editable": true
+    },
+    {
+      "id": "oa-private-cloud",
+      "name": "OA Network - Private Cloud",
+      "description": "On-premises private cloud resources and services.",
+      "examples": [
+        "Virtualized workloads",
+        "Private cloud platform services",
+        "Internal container platforms"
+      ],
+      "tags": [
+        "oa",
+        "private-cloud"
+      ],
+      "styleRef": "zone.oa-private-cloud",
+      "editable": true
+    },
+    {
+      "id": "oa-app-dmz",
+      "name": "OA Network - App DMZ",
+      "description": "Application DMZ segment for controlled exposure.",
+      "examples": [
+        "Public-facing app services",
+        "Reverse proxy tiers",
+        "Ingress controls"
+      ],
+      "tags": [
+        "oa",
+        "app-dmz"
+      ],
+      "styleRef": "zone.oa-app-dmz",
+      "editable": true
+    },
+    {
+      "id": "dmz",
+      "name": "DMZ",
+      "description": "Demilitarized zone for externally exposed systems.",
+      "examples": [
+        "Gateways",
+        "WAF and edge security",
+        "Bastion-like components"
+      ],
+      "tags": [
+        "dmz"
+      ],
+      "styleRef": "zone.dmz",
+      "editable": true
+    },
+    {
+      "id": "aws-landing-zone",
+      "name": "AWS Landing Zone",
+      "description": "AWS landing zone with governed multi-account boundaries.",
+      "examples": [
+        "Shared platform services",
+        "Application VPCs",
+        "Cloud security controls"
+      ],
+      "tags": [
+        "aws",
+        "landing-zone"
+      ],
+      "styleRef": "zone.aws-landing-zone",
+      "editable": true
+    },
+    {
+      "id": "sources",
+      "name": "Sources",
+      "description": "External entry points and user sources including internet-facing clients and external networks.",
+      "examples": [
+        "Browser clients (G-net)",
+        "FTS/SFTP ingress",
+        "Email ingress",
+        "Public internet access"
+      ],
+      "tags": [
+        "external",
+        "sources",
+        "internet"
+      ],
+      "styleRef": "zone.sources",
+      "editable": true
+    },
+    {
+      "id": "idmz",
+      "name": "IDMZ (Internet Facing DMZ)",
+      "description": "Internet-facing DMZ hosting WAF, web servers, and identity gateways exposed to external traffic.",
+      "examples": [
+        "Web Application Firewall (WAF)",
+        "Web Servers",
+        "IDP Identity Gateways",
+        "FTS File Server"
+      ],
+      "tags": [
+        "idmz",
+        "internet-dmz",
+        "waf"
+      ],
+      "styleRef": "zone.idmz",
+      "editable": true
+    },
+    {
+      "id": "g-net",
+      "name": "G-net",
+      "description": "Hong Kong Government network carrying internal government traffic to HKMA systems.",
+      "examples": [
+        "Government browser clients",
+        "G-net routed API requests"
+      ],
+      "tags": [
+        "g-net",
+        "government",
+        "hk"
+      ],
+      "styleRef": "zone.g-net",
+      "editable": true
+    },
+    {
+      "id": "iclnet",
+      "name": "ICLNet",
+      "description": "HKMA ICLNet carrying FTS and regulated file-transfer traffic.",
+      "examples": [
+        "FTS file transfers",
+        "ICL-routed submissions"
+      ],
+      "tags": [
+        "iclnet",
+        "icl",
+        "hkma"
+      ],
+      "styleRef": "zone.iclnet",
+      "editable": true
+    },
+    {
+      "id": "data-platform",
+      "name": "Data Platform",
+      "description": "Dedicated data analytics and validation platform including DAAS, BI, and data quality services.",
+      "examples": [
+        "Dremio DAAS",
+        "Tableau BI",
+        "Xceptor Data Validation",
+        "Pure Storage S3 buckets (Inward, Outward, Staging, Validation)"
+      ],
+      "tags": [
+        "data",
+        "analytics",
+        "daas",
+        "bi"
+      ],
+      "styleRef": "zone.data-platform",
+      "editable": true
+    },
+    {
+      "id": "k8s-cluster",
+      "name": "K8s Cluster",
+      "description": "Kubernetes cluster hosting containerised microservices, BFF portals, and AI workloads.",
+      "examples": [
+        "AI Node workloads",
+        "HKMA Node workloads",
+        "Internal Kong API Gateway",
+        "Microservice topics"
+      ],
+      "tags": [
+        "k8s",
+        "kubernetes",
+        "containers"
+      ],
+      "styleRef": "zone.k8s-cluster",
+      "editable": true
+    },
+    {
+      "id": "k8s-namespace",
+      "name": "K8s Namespace",
+      "description": "Kubernetes namespace providing logical isolation between workload groups within the same cluster. Use to separate app services, messaging infrastructure, and monitoring from each other.",
+      "examples": [
+        "app-namespace (BFF + microservices)",
+        "messaging-namespace (Kafka StatefulSet)",
+        "monitoring-namespace (Grafana, APM)"
+      ],
+      "tags": [
+        "k8s",
+        "namespace",
+        "isolation"
+      ],
+      "styleRef": "zone.k8s-namespace",
+      "editable": true
+    },
+    {
+      "id": "messaging-infrastructure",
+      "name": "Messaging Infrastructure",
+      "description": "Dedicated stateful messaging layer (Kafka or equivalent) with its own storage, replication, and scaling concerns. Kept separate from application namespaces.",
+      "examples": [
+        "Kafka broker cluster (StatefulSet)",
+        "Topic partitions (Submission, File, Validation, Notification)",
+        "Queue Management controller"
+      ],
+      "tags": [
+        "kafka",
+        "messaging",
+        "event-driven",
+        "stateful"
+      ],
+      "styleRef": "zone.messaging-infrastructure",
+      "editable": true
+    }
+  ],
+  "componentCategories": [
+    {
+      "id": "database",
+      "name": "Database",
+      "styleRef": "category.database"
+    },
+    {
+      "id": "backend",
+      "name": "Backend",
+      "styleRef": "category.backend"
+    },
+    {
+      "id": "frontend",
+      "name": "Frontend",
+      "styleRef": "category.frontend"
+    },
+    {
+      "id": "integration",
+      "name": "Integration",
+      "styleRef": "category.integration"
+    },
+    {
+      "id": "security",
+      "name": "Security",
+      "styleRef": "category.security"
+    },
+    {
+      "id": "middleware",
+      "name": "Middleware",
+      "styleRef": "category.middleware"
+    },
+    {
+      "id": "storage",
+      "name": "Storage",
+      "styleRef": "category.storage"
+    },
+    {
+      "id": "monitoring",
+      "name": "Monitoring",
+      "styleRef": "category.monitoring"
+    },
+    {
+      "id": "external",
+      "name": "External",
+      "styleRef": "category.external"
+    },
+    {
+      "id": "iam",
+      "name": "IAM",
+      "styleRef": "category.iam"
+    },
+    {
+      "id": "orchestration",
+      "name": "Orchestration",
+      "styleRef": "category.orchestration"
+    },
+    {
+      "id": "ai",
+      "name": "AI",
+      "styleRef": "category.ai"
+    },
+    {
+      "id": "cicd",
+      "name": "CI/CD",
+      "styleRef": "category.cicd"
+    }
+  ],
+  "components": [
+    {"id": "database-postgres", "category": "database", "label": "PostgreSQL"},
+    {"id": "database-mysql", "category": "database", "label": "MySQL"},
+    {"id": "database-oracle", "category": "database", "label": "Oracle"},
+    {"id": "database-mongodb", "category": "database", "label": "MongoDB"},
+    {"id": "data-dremio", "category": "database", "label": "Dremio"},
+    {"id": "backend-nodejs", "category": "backend", "label": "Node.js Backend"},
+    {"id": "backend-fastapi", "category": "backend", "label": "FastAPI Backend"},
+    {"id": "backend-flask", "category": "backend", "label": "Flask Backend"},
+    {"id": "backend-dotnet", "category": "backend", "label": ".NET Backend"},
+    {"id": "backend-express", "category": "backend", "label": "Express Backend"},
+    {"id": "backend-drizzle-orm", "category": "backend", "label": "Drizzle ORM"},
+    {"id": "container-docker", "category": "backend", "label": "Docker Container"},
+    {"id": "backend-submission-engine", "category": "backend", "label": "Submission Engine"},
+    {"id": "backend-validation-engine", "category": "backend", "label": "Validation Engine"},
+    {"id": "backend-workflow-engine", "category": "backend", "label": "Workflow Engine"},
+    {"id": "backend-notification-svc", "category": "backend", "label": "Notification Service"},
+    {"id": "backend-report-generator", "category": "backend", "label": "Report Generator"},
+    {"id": "backend-data-transform", "category": "backend", "label": "Data Transform Service"},
+    {"id": "backend-scheduler", "category": "backend", "label": "Scheduler"},
+    {"id": "frontend-nextjs", "category": "frontend", "label": "Next.js Frontend"},
+    {"id": "frontend-gradio", "category": "frontend", "label": "Gradio Frontend"},
+    {"id": "frontend-axios", "category": "frontend", "label": "Axios Client"},
+    {"id": "frontend-ai-portal", "category": "frontend", "label": "AI Portal"},
+    {"id": "frontend-admin-portal", "category": "frontend", "label": "Admin Portal"},
+    {"id": "integration-api-gateway", "category": "integration", "label": "API Gateway"},
+    {"id": "integration-esb", "category": "integration", "label": "ESB"},
+    {"id": "integration-mq", "category": "integration", "label": "Message Queue"},
+    {"id": "integration-sftp", "category": "integration", "label": "SFTP"},
+    {"id": "integration-email-gateway", "category": "integration", "label": "Email Gateway"},
+    {"id": "issue-tracking-jira", "category": "integration", "label": "Jira"},
+    {"id": "bi-tableau", "category": "integration", "label": "Tableau BI"},
+    {"id": "external-lseg-api", "category": "integration", "label": "LSEG External API"},
+    {"id": "security-iam", "category": "security", "label": "IAM"},
+    {"id": "security-pki", "category": "security", "label": "PKI"},
+    {"id": "security-vault", "category": "security", "label": "Vault"},
+    {"id": "security-siem", "category": "security", "label": "SIEM"},
+    {"id": "security-edr", "category": "security", "label": "EDR"},
+    {"id": "middleware-load-balancer", "category": "middleware", "label": "Load Balancer"},
+    {"id": "middleware-waf", "category": "middleware", "label": "WAF"},
+    {"id": "middleware-reverse-proxy", "category": "middleware", "label": "Reverse Proxy"},
+    {"id": "middleware-cache", "category": "middleware", "label": "Cache"},
+    {"id": "storage-object", "category": "storage", "label": "Object Storage"},
+    {"id": "storage-archive", "category": "storage", "label": "Archive Storage"},
+    {"id": "storage-dw", "category": "storage", "label": "Data Warehouse"},
+    {"id": "storage-pure-storage", "category": "storage", "label": "Pure Storage"},
+    {"id": "storage-filecloud", "category": "storage", "label": "FileCloud"},
+    {"id": "monitoring-logging", "category": "monitoring", "label": "Logging"},
+    {"id": "monitoring-apm", "category": "monitoring", "label": "APM"},
+    {"id": "monitoring-alerting", "category": "monitoring", "label": "Alerting"},
+    {"id": "monitoring-grafana", "category": "monitoring", "label": "Grafana"},
+    {"id": "external-ai-systems", "category": "external", "label": "External AI Systems"},
+    {"id": "external-hkma-internal", "category": "external", "label": "HKMA Internal External"},
+    {"id": "external-regtech", "category": "external", "label": "RegTech External"},
+    {"id": "iam-active-directory", "category": "iam", "label": "Active Directory"},
+    {"id": "orchestration-kubernetes", "category": "orchestration", "label": "Kubernetes"},
+    {"id": "ai-maas-genai", "category": "ai", "label": "MaaS GenAI"},
+    {"id": "ai-rayserve", "category": "ai", "label": "Ray Serve"},
+    {"id": "ai-dify", "category": "ai", "label": "Dify"},
+    {"id": "cicd-harbor", "category": "cicd", "label": "Harbor"},
+    {"id": "cicd-jenkins", "category": "cicd", "label": "Jenkins"},
+    {"id": "cicd-ansible", "category": "cicd", "label": "Ansible"},
+    {"id": "cicd-sonarqube", "category": "cicd", "label": "SonarQube"},
+    {"id": "cicd-gitlab", "category": "cicd", "label": "GitLab"},
+
+    {"id": "middleware-web-server", "category": "middleware", "label": "Web Server"},
+    {"id": "middleware-external-load-balancer", "category": "middleware", "label": "External Load Balancer"},
+
+    {"id": "iam-idp-identity-gateway", "category": "iam", "label": "IDP Identity Gateway"},
+    {"id": "iam-idp-am", "category": "iam", "label": "IDP Access Manager"},
+    {"id": "iam-idp-ds", "category": "iam", "label": "IDP Directory Service"},
+    {"id": "iam-idp-idm", "category": "iam", "label": "IDP Identity Manager"},
+    {"id": "iam-adfs", "category": "iam", "label": "ADFS"},
+
+    {"id": "integration-kong-api-gateway", "category": "integration", "label": "Kong API Gateway"},
+    {"id": "integration-smtp", "category": "integration", "label": "SMTP"},
+    {"id": "integration-queue-management", "category": "integration", "label": "Queue Management"},
+    {"id": "integration-fts", "category": "integration", "label": "FTS"},
+    {"id": "integration-kafka-topic", "category": "integration", "label": "Kafka Topic"},
+
+    {"id": "frontend-browser-spa", "category": "frontend", "label": "Browser SPA"},
+    {"id": "frontend-hkma-web-portal", "category": "frontend", "label": "HKMA Web Portal"},
+
+    {"id": "backend-hkma-portal-bff", "category": "backend", "label": "HKMA Portal BFF"},
+    {"id": "backend-ai-portal-bff", "category": "backend", "label": "AI Portal BFF"},
+    {"id": "backend-file-io-svc", "category": "backend", "label": "File IO Service"},
+    {"id": "backend-information-svc", "category": "backend", "label": "Information Service"},
+    {"id": "backend-xceptor", "category": "backend", "label": "Xceptor Data Validation"},
+    {"id": "backend-app-server", "category": "backend", "label": "App Server"},
+
+    {"id": "security-ids", "category": "security", "label": "Intrusion Detection Software (IDS)"},
+    {"id": "security-antivirus", "category": "security", "label": "Antivirus Service"},
+
+    {"id": "storage-s3-bucket", "category": "storage", "label": "S3 Bucket"},
+    {"id": "storage-fts-file-server", "category": "storage", "label": "FTS File Server"},
+
+    {"id": "external-browser-client", "category": "external", "label": "Browser Client"},
+    {"id": "external-public-internet", "category": "external", "label": "Public Internet"},
+
+    {"id": "orchestration-k8s-node", "category": "orchestration", "label": "K8s Node"},
+    {"id": "orchestration-k8s-ai-node", "category": "orchestration", "label": "K8s AI Node"},
+    {"id": "orchestration-k8s-hkma-node", "category": "orchestration", "label": "K8s HKMA Node"},
+    {"id": "orchestration-k8s-deployment", "category": "orchestration", "label": "K8s Deployment"},
+    {"id": "orchestration-k8s-statefulset", "category": "orchestration", "label": "K8s StatefulSet"},
+    {"id": "orchestration-k8s-namespace", "category": "orchestration", "label": "K8s Namespace"}
+  ],
+  "styles": {
+    "zone.oa-baremetal": "swimlane;rounded=1;container=1;collapsible=0;html=1;whiteSpace=wrap;fontStyle=1;fillColor=#FFF3E0;strokeColor=#E67E22;fontColor=#6E2C00;",
+    "zone.oa-private-cloud": "swimlane;rounded=1;container=1;collapsible=0;html=1;whiteSpace=wrap;fontStyle=1;fillColor=#E8F8F5;strokeColor=#16A085;fontColor=#0E6251;",
+    "zone.oa-app-dmz": "swimlane;rounded=1;container=1;collapsible=0;html=1;whiteSpace=wrap;fontStyle=1;fillColor=#FDEDEC;strokeColor=#C0392B;fontColor=#78281F;",
+    "zone.dmz": "swimlane;rounded=1;container=1;collapsible=0;html=1;whiteSpace=wrap;fontStyle=1;fillColor=#F4ECF7;strokeColor=#8E44AD;fontColor=#512E5F;",
+    "zone.aws-landing-zone": "swimlane;rounded=1;container=1;collapsible=0;html=1;whiteSpace=wrap;fontStyle=1;fillColor=#EBF5FB;strokeColor=#2E86C1;fontColor=#1B4F72;",
+    "zone.sources": "swimlane;rounded=1;container=1;collapsible=0;html=1;whiteSpace=wrap;fontStyle=1;fillColor=#FEF9E7;strokeColor=#F39C12;fontColor=#7D6608;dashed=1;",
+    "zone.idmz": "swimlane;rounded=1;container=1;collapsible=0;html=1;whiteSpace=wrap;fontStyle=1;fillColor=#FFF8E1;strokeColor=#FF8C00;fontColor=#7D3C00;strokeWidth=3;",
+    "zone.g-net": "swimlane;rounded=1;container=1;collapsible=0;html=1;whiteSpace=wrap;fontStyle=1;fillColor=#E8F4FD;strokeColor=#1A5276;fontColor=#1A5276;dashed=1;",
+    "zone.iclnet": "swimlane;rounded=1;container=1;collapsible=0;html=1;whiteSpace=wrap;fontStyle=1;fillColor=#F5EEF8;strokeColor=#6C3483;fontColor=#4A235A;dashed=1;",
+    "zone.data-platform": "swimlane;rounded=1;container=1;collapsible=0;html=1;whiteSpace=wrap;fontStyle=1;fillColor=#EAECEE;strokeColor=#5D6D7E;fontColor=#212F3D;",
+    "zone.k8s-cluster": "swimlane;rounded=1;container=1;collapsible=0;html=1;whiteSpace=wrap;fontStyle=1;fillColor=#EBF5FB;strokeColor=#2874A6;fontColor=#1B4F72;strokeWidth=2;",
+    "zone.k8s-namespace": "swimlane;rounded=1;container=1;collapsible=0;html=1;whiteSpace=wrap;fontStyle=1;fillColor=#F0F4FF;strokeColor=#4A6FD4;fontColor=#1B3A8A;dashed=1;strokeWidth=1;",
+    "zone.messaging-infrastructure": "swimlane;rounded=1;container=1;collapsible=0;html=1;whiteSpace=wrap;fontStyle=1;fillColor=#FFF8F0;strokeColor=#E67E22;fontColor=#7D3C00;dashed=1;",
+    "category.database": "shape=cylinder3;size=15;whiteSpace=wrap;html=1;fillColor=#D6EAF8;strokeColor=#2E86C1;fontColor=#1B4F72;",
+    "category.backend": "rounded=1;whiteSpace=wrap;html=1;fillColor=#D5F5E3;strokeColor=#1E8449;fontColor=#145A32;",
+    "category.frontend": "rounded=1;whiteSpace=wrap;html=1;fillColor=#FCF3CF;strokeColor=#B7950B;fontColor=#7D6608;",
+    "category.integration": "shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fillColor=#FADBD8;strokeColor=#CB4335;fontColor=#78281F;",
+    "category.security": "shape=mxgraph.aws4.security_identity_compliance.security_hub;whiteSpace=wrap;html=1;fillColor=#F5EEF8;strokeColor=#7D3C98;fontColor=#512E5F;",
+    "category.middleware": "rounded=1;arcSize=12;whiteSpace=wrap;html=1;fillColor=#E8DAEF;strokeColor=#8E44AD;fontColor=#512E5F;",
+    "category.storage": "shape=mxgraph.ibm.storage;whiteSpace=wrap;html=1;fillColor=#D6EAF8;strokeColor=#2874A6;fontColor=#1B4F72;",
+    "category.monitoring": "shape=mxgraph.c4.component;whiteSpace=wrap;html=1;fillColor=#EAECEE;strokeColor=#566573;fontColor=#2C3E50;",
+    "category.external": "rounded=1;dashed=1;whiteSpace=wrap;html=1;fillColor=#FDFEFE;strokeColor=#7F8C8D;fontColor=#2C3E50;",
+    "category.iam": "shape=mxgraph.active_directory.domain_controller;whiteSpace=wrap;html=1;fillColor=#EAF2F8;strokeColor=#5D6D7E;fontColor=#2C3E50;",
+    "category.orchestration": "shape=mxgraph.kubernetes.master;whiteSpace=wrap;html=1;fillColor=#D4E6F1;strokeColor=#2471A3;fontColor=#1B4F72;",
+    "category.ai": "shape=mxgraph.gcp2.ai_and_machine_learning;whiteSpace=wrap;html=1;fillColor=#FDEDEC;strokeColor=#C0392B;fontColor=#78281F;",
+    "category.cicd": "rounded=1;whiteSpace=wrap;html=1;fillColor=#EBDEF0;strokeColor=#884EA0;fontColor=#512E5F;"
+  },
+  "firewallRules": {
+    "default": { "required": true, "firewallType": "physical", "provider": "NSX" },
+    "rules": [
+      {
+        "id": "fw-same-parent-no-op",
+        "priority": 1000,
+        "enabled": true,
+        "when": { "sameParent": true },
+        "effect": {
+          "required": false,
+          "firewallType": "none",
+          "provider": "none",
+          "reason": "Intra-host / same parent container; no firewall required."
+        }
+      },
+      {
+        "id": "fw-cross-zone-default",
+        "priority": 900,
+        "enabled": true,
+        "when": { "sameZone": false },
+        "effect": {
+          "required": true,
+          "firewallType": "physical",
+          "provider": "NSX",
+          "reason": "Cross-zone traffic requires physical NSX firewall."
+        }
+      },
+      {
+        "id": "fw-oa-private-cloud-same-zone",
+        "priority": 500,
+        "enabled": true,
+        "when": { "sameZone": true, "zoneId": ["oa-private-cloud"] },
+        "effect": {
+          "required": true,
+          "firewallType": "virtual",
+          "provider": "PSO",
+          "reason": "Intra oa-private-cloud uses PSO micro-segmentation."
+        }
+      },
+      {
+        "id": "fw-aws-landing-zone-same-zone",
+        "priority": 500,
+        "enabled": true,
+        "when": { "sameZone": true, "zoneId": ["aws-landing-zone"] },
+        "effect": {
+          "required": true,
+          "firewallType": "virtual",
+          "provider": "AWS",
+          "reason": "Intra AWS landing zone uses AWS SG/NACL."
+        }
+      },
+      {
+        "id": "fw-oa-baremetal-same-zone",
+        "priority": 400,
+        "enabled": true,
+        "when": { "sameZone": true, "zoneId": ["oa-baremetal", "oa-app-dmz", "dmz"] },
+        "effect": {
+          "required": true,
+          "firewallType": "physical",
+          "provider": "NSX",
+          "reason": "Intra baremetal/DMZ uses physical NSX."
+        }
+      },
+      {
+        "id": "fw-idmz-same-zone",
+        "priority": 400,
+        "enabled": true,
+        "when": { "sameZone": true, "zoneId": ["idmz"] },
+        "effect": {
+          "required": true,
+          "firewallType": "physical",
+          "provider": "NSX",
+          "reason": "Intra IDMZ uses physical NSX."
+        }
+      },
+      {
+        "id": "fw-k8s-same-zone",
+        "priority": 400,
+        "enabled": true,
+        "when": { "sameZone": true, "zoneId": ["k8s-cluster", "k8s-namespace", "messaging-infrastructure"] },
+        "effect": {
+          "required": true,
+          "firewallType": "virtual",
+          "provider": "NSX",
+          "reason": "Intra Kubernetes cluster/namespace uses virtual NSX micro-segmentation."
+        }
+      },
+      {
+        "id": "fw-data-platform-same-zone",
+        "priority": 400,
+        "enabled": true,
+        "when": { "sameZone": true, "zoneId": ["data-platform"] },
+        "effect": {
+          "required": true,
+          "firewallType": "physical",
+          "provider": "NSX",
+          "reason": "Intra Data Platform zone uses physical NSX."
+        }
+      }
+    ]
+  },
+  "rules": {
+    "edgeRules": [
+      {
+        "id": "deny-external-to-database-direct",
+        "enabled": true,
+        "effect": "deny",
+        "priority": 100,
+        "severity": "error",
+        "when": {
+          "fromCategory": ["external"],
+          "toCategory": ["database"]
+        },
+        "message": "External components cannot connect directly to database components."
+      },
+      {
+        "id": "deny-integration-to-backend",
+        "enabled": true,
+        "effect": "deny",
+        "priority": 10,
+        "severity": "info",
+        "when": {
+          "fromCategory": ["integration"],
+          "toCategory": ["backend"]
+        },
+        "message": "Integration components are not allowed to connect to backend components."
+      }
+    ],
+    "containmentRules": [
+      {
+        "id": "deny-external-in-oa-baremetal",
+        "enabled": true,
+        "effect": "deny",
+        "priority": 100,
+        "severity": "error",
+        "when": {
+          "componentCategory": ["external"],
+          "zoneId": ["oa-baremetal"]
+        },
+        "message": "External components cannot be placed in OA Baremetal zone."
+      },
+      {
+        "id": "deny-database-in-aws-landing-zone",
+        "enabled": true,
+        "effect": "deny",
+        "priority": 10,
+        "severity": "info",
+        "when": {
+          "componentCategory": ["database"],
+          "zoneId": ["aws-landing-zone"]
+        },
+        "message": "Database components are not allowed in AWS Landing Zone."
+      }
+    ]
+  }
+}

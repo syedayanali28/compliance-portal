@@ -901,7 +901,254 @@
 		}), null, null, Editor.ctrlKey + '+K');
 		action.setToggleAction(true);
 		action.setSelectedCallback(mxUtils.bind(this, function() { return this.tagsWindow != null && this.tagsWindow.window.isVisible(); }));
+
+		editorUi.actions.addAction('validationRules...', function()
+		{
+			var dlg = new ValidationRulesDialog(editorUi);
+			editorUi.showDialog(dlg.container, 760, 560, true, true, function(cancel)
+			{
+				if (!cancel)
+				{
+					dlg.save();
+					editorUi.refreshArchitectureSchema();
+				}
+			});
+			dlg.init();
+		});
+
+		editorUi.actions.addAction('runValidationSelfTest...', function()
+		{
+			if (window.ArchitectureValidationSelfTest == null || window.ArchitectureSchemaRegistry == null)
+			{
+				editorUi.showError(mxResources.get('error'),
+					'Validation self-test module is not available.', mxResources.get('ok'));
+				return;
+			}
+			
+			mxUtils.get('js/diagramly/architecture/ValidationFixtures.json', function(req)
+			{
+				try
+				{
+					var fixtures = JSON.parse(req.getText());
+					var graph = editorUi.editor.graph;
+					var results = window.ArchitectureValidationSelfTest.run(graph, fixtures);
+					var dlg = new ValidationSelfTestDialog(editorUi, results);
+					editorUi.showDialog(dlg.container, 720, 500, true, true);
+					dlg.init();
+				}
+				catch (e)
+				{
+					editorUi.showError(mxResources.get('error'), e.message, mxResources.get('ok'));
+				}
+			},
+			function()
+			{
+				editorUi.showError(mxResources.get('error'),
+					'Could not load ValidationFixtures.json', mxResources.get('ok'));
+			});
+		});
 		
+	var openArchitectureAdmin = function()
+	{
+		var dlg = new ArchitectureCatalogDialog(editorUi);
+		editorUi.showDialog(dlg.container, 960, 640, true, true);
+		dlg.init();
+	};
+
+	editorUi.actions.addAction('extractDiagramJson...', function()
+	{
+		// Export the native draw.io XML so it can be dragged back into draw.io
+		var xml = null;
+
+		try
+		{
+			xml = editorUi.getFileData(true, null, null, null, null, true);
+		}
+		catch (e1)
+		{
+			try { xml = mxUtils.getXml(editorUi.editor.getGraphXml()); }
+			catch (e2) { xml = null; }
+		}
+
+		if (xml == null || xml.length === 0)
+		{
+			editorUi.showError(mxResources.get('error'), 'Could not retrieve diagram XML.', mxResources.get('ok'));
+			return;
+		}
+
+		// Derive a safe base filename from the document title
+		var rawTitle = (document.title || 'diagram').replace(/\s*-\s*draw\.io$/i, '').trim() || 'diagram';
+		var safeBase = rawTitle.replace(/[^a-zA-Z0-9_\-\.]/g, '_');
+
+		var dlg = new DrawioExportPreviewDialog(editorUi, 'Export Diagram (.drawio)', xml, safeBase);
+		editorUi.showDialog(dlg.container, 760, 560, true, true);
+		dlg.init();
+	});
+
+	editorUi.actions.addAction('extractFirewallRequestsJson...', function()
+	{
+		if (window.ArchitectureFirewallExtractor == null)
+		{
+			editorUi.showError(mxResources.get('error'),
+				'FirewallExtractor module is not available.', mxResources.get('ok'));
+			return;
+		}
+
+		var graph = editorUi.editor.graph;
+		var schema = null;
+
+		if (window.ArchitectureSchemaRegistry != null)
+		{
+			schema = window.ArchitectureSchemaRegistry.refreshEffective(editorUi);
+		}
+
+		var out = window.ArchitectureFirewallExtractor.extract(graph, schema);
+		var sv  = out.schemaValidation || {};
+
+		var summaryHtml =
+			'<strong>Firewall Requests Generated:</strong> ' + (out.rows ? out.rows.length : 0) +
+			'&nbsp;&nbsp;|&nbsp;&nbsp;<strong>Edge Validation:</strong> ' +
+			sv.passed + ' passed, ' + sv.failed + ' failed';
+
+		if (sv.failed > 0)
+		{
+			summaryHtml += '<br><span style="color:#f88;font-weight:600;">&#9888; ' + sv.failed +
+				' validation violation' + (sv.failed !== 1 ? 's' : '') +
+				' found. Review before downloading — violating edges are flagged in the JSON below.</span>';
+		}
+		else
+		{
+			summaryHtml += '<br><span style="color:#6f6;">&#10003; All edges passed validation.</span>';
+		}
+
+		// If there are violations, ask the user whether to proceed
+		function openPreviewDialog()
+		{
+			var dlg = new JsonExportPreviewDialog(
+				editorUi,
+				'Extract Firewall Requests JSON',
+				out,
+				'firewall-requests',
+				'<div style="padding:4px 0;">' + summaryHtml + '</div>'
+			);
+			editorUi.showDialog(dlg.container, 800, 600, true, true);
+			dlg.init();
+		}
+
+		if (sv.failed > 0)
+		{
+			editorUi.confirm(
+				sv.failed + ' edge rule violation' + (sv.failed !== 1 ? 's were' : ' was') +
+				' found during validation.\n\nViolating connections may produce incorrect firewall rules.' +
+				' Do you want to proceed and review the output anyway?',
+				function()
+				{
+					openPreviewDialog();
+				}
+			);
+		}
+		else
+		{
+			openPreviewDialog();
+		}
+	});
+
+	var openAddZonesComponentsDialog = openArchitectureAdmin;
+		
+		editorUi.actions.addAction('addZonesComponents...', function()
+		{
+			openArchitectureAdmin();
+		});
+		
+		editorUi.actions.addAction('architectureCatalog...', function()
+		{
+			openArchitectureAdmin();
+		});
+
+		editorUi.actions.addAction('projectsPortal...', function()
+		{
+			window.open('projects.html', '_blank');
+		});
+
+		// Bridge function used by projects.html via window.opener to extract
+		// diagram JSON and firewall requests JSON from the currently open canvas.
+		window.extractForProject = function()
+		{
+			var graph = editorUi.editor.graph;
+			var schema = (window.ArchitectureSchemaRegistry != null)
+				? window.ArchitectureSchemaRegistry.getEffective()
+				: null;
+			var title = editorUi.getBaseFilename(true) || 'diagram';
+
+			if (window.ArchitectureFirewallExtractor == null)
+			{
+				throw new Error('FirewallExtractor module is not loaded. Reload the draw.io canvas and try again.');
+			}
+
+			// Export native draw.io XML so it can be dragged back into draw.io
+			var diagramXml = null;
+			try
+			{
+				diagramXml = editorUi.getFileData(true, null, null, null, null, true);
+			}
+			catch (e)
+			{
+				try { diagramXml = mxUtils.getXml(editorUi.editor.getGraphXml()); }
+				catch (e2) { diagramXml = null; }
+			}
+
+			return {
+				diagramXml:   diagramXml,
+				filename:     title,
+				firewallJson: window.ArchitectureFirewallExtractor.extract(graph, schema)
+			};
+		};
+		
+		// ── Open Draft from Projects Portal ─────────────────────────────────
+		// When the Projects Portal opens a diagram via "Open in Canvas", it stores
+		// the XML in localStorage under a temp key and navigates to
+		// index.html?openDraft=<key>. We detect that here and load it.
+		(function()
+		{
+			var draftKey = (typeof urlParams !== 'undefined') ? urlParams['openDraft'] : null;
+
+			if (!draftKey)
+			{
+				return;
+			}
+
+			try
+			{
+				var xml = localStorage.getItem(draftKey);
+
+				if (!xml)
+				{
+					return;
+				}
+
+				// Clean up the temp key immediately
+				localStorage.removeItem(draftKey);
+
+				// Wait for the editor to be fully ready before loading
+				window.setTimeout(function()
+				{
+					try
+					{
+						editorUi.editor.setGraphXml(mxUtils.parseXml(xml).documentElement);
+						editorUi.editor.setModified(false);
+					}
+					catch (e)
+					{
+						if (window.console) { console.warn('[openDraft] Failed to load XML:', e); }
+					}
+				}, 800);
+			}
+			catch (e)
+			{
+				if (window.console) { console.warn('[openDraft] localStorage error:', e); }
+			}
+		})();
+
 		// Shown on aj/ac domains
 		if ((EditorUi.isElectronApp ||
 			(Editor.enableAi || ((Editor.config == null ||
@@ -4381,7 +4628,24 @@
 				}
 				
 				editorUi.menus.addMenuItems(menu, ['-', 'findReplace',
-					'layers', 'tags', 'outline', '-'], parent);
+					'layers', 'tags'], parent);
+				
+				menu.addItem('Validation Rules', null, function()
+				{
+					editorUi.actions.get('validationRules').funct();
+				}, parent);
+				
+				menu.addItem('Run Validation Self-Test', null, function()
+				{
+					editorUi.actions.get('runValidationSelfTest').funct();
+				}, parent);
+				
+				menu.addItem('Architecture Admin', null, function()
+				{
+					editorUi.actions.get('architectureCatalog').funct();
+				}, parent);
+				
+				editorUi.menus.addMenuItems(menu, ['outline', '-'], parent);
 				
 				if (editorUi.commentsSupported())
 				{
@@ -4397,9 +4661,25 @@
 			}
 			else
 			{
-				this.addMenuItems(menu, (['format', 'outline', 'layers', 'tags']).
-					concat((editorUi.commentsSupported()) ?
-					['comments', '-'] : ['-']));
+				this.addMenuItems(menu, ['format', 'outline', 'layers', 'tags'], parent);
+				
+				menu.addItem('Validation Rules', null, function()
+				{
+					editorUi.actions.get('validationRules').funct();
+				}, parent);
+				
+				menu.addItem('Run Validation Self-Test', null, function()
+				{
+					editorUi.actions.get('runValidationSelfTest').funct();
+				}, parent);
+				
+				menu.addItem('Architecture Admin', null, function()
+				{
+					editorUi.actions.get('architectureCatalog').funct();
+				}, parent);
+				
+				this.addMenuItems(menu, (editorUi.commentsSupported()) ?
+					['comments', '-'] : ['-'], parent);
 				
 				this.addMenuItems(menu, ['-', 'search'], parent);
 				
@@ -5173,10 +5453,28 @@
 				{
 					editorUi.menus.addMenuItems(menu, ['-', 'autosave'], parent);
 				}
-			}
-			else
+				
+			menu.addSeparator(parent);
+			menu.addItem('Extract Diagram JSON', null, function()
 			{
-				var file = this.editorUi.getCurrentFile();
+				editorUi.actions.get('extractDiagramJson').funct();
+			}, parent);
+			menu.addItem('Extract Firewall Requests JSON', null, function()
+			{
+				editorUi.actions.get('extractFirewallRequestsJson').funct();
+			}, parent);
+			menu.addItem('Architecture Admin', null, function()
+			{
+				openArchitectureAdmin();
+			}, parent);
+			menu.addItem('Projects Portal', null, function()
+			{
+				window.open('projects.html', '_blank');
+			}, parent);
+		}
+		else
+		{
+			var file = this.editorUi.getCurrentFile();
 				
 				if (file != null && file.constructor == DriveFile)
 				{
@@ -5304,8 +5602,26 @@
 				{
 					this.addMenuItems(menu, ['print'], parent);
 				}
+				
+			menu.addSeparator(parent);
+			menu.addItem('Extract Diagram JSON', null, function()
+			{
+				editorUi.actions.get('extractDiagramJson').funct();
+			}, parent);
+			menu.addItem('Extract Firewall Requests JSON', null, function()
+			{
+				editorUi.actions.get('extractFirewallRequestsJson').funct();
+			}, parent);
+			menu.addItem('Architecture Admin', null, function()
+			{
+				openArchitectureAdmin();
+			}, parent);
+			menu.addItem('Projects Portal', null, function()
+			{
+				window.open('projects.html', '_blank');
+			}, parent);
 
-				this.addMenuItems(menu, ['-', 'close']);
+			this.addMenuItems(menu, ['-', 'close']);
 			}
 		})));
 		

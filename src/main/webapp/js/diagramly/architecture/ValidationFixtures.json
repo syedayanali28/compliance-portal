@@ -1,0 +1,61 @@
+{
+  "name": "ArchitectureValidationFixtures",
+  "version": "1.0.0",
+  "cases": [
+    {
+      "id": "edge-default-allow-no-rules",
+      "type": "edge",
+      "schema": {
+        "policies": {"edge": {"default": "allow"}},
+        "rules": {"edgeRules": []}
+      },
+      "source": {"componentId": "frontend-nextjs", "category": "frontend", "zoneId": "dmz"},
+      "target": {"componentId": "backend-nodejs", "category": "backend", "zoneId": "oa-app-dmz"},
+      "expectAllowed": true
+    },
+    {
+      "id": "edge-explicit-deny-overrides",
+      "type": "edge",
+      "schema": {
+        "policies": {"edge": {"default": "allow"}},
+        "rules": {
+          "edgeRules": [
+            {"id": "allow-integration-to-backend", "enabled": true, "effect": "allow", "priority": 10, "when": {"fromCategory": ["integration"], "toCategory": ["backend"]}},
+            {"id": "deny-integration-to-backend", "enabled": true, "effect": "deny", "priority": 100, "when": {"fromCategory": ["integration"], "toCategory": ["backend"]}, "message": "Denied by precedence"}
+          ]
+        }
+      },
+      "source": {"componentId": "integration-api-gateway", "category": "integration", "zoneId": "dmz"},
+      "target": {"componentId": "backend-nodejs", "category": "backend", "zoneId": "oa-app-dmz"},
+      "expectAllowed": false,
+      "expectViolationRuleId": "deny-integration-to-backend"
+    },
+    {
+      "id": "containment-deny-external-in-oa-baremetal",
+      "type": "containment",
+      "schema": {
+        "policies": {"containment": {"default": "allow"}},
+        "rules": {
+          "containmentRules": [
+            {"id": "deny-external-in-oa-baremetal", "enabled": true, "effect": "deny", "priority": 100, "when": {"componentCategory": ["external"], "zoneId": ["oa-baremetal"]}}
+          ]
+        }
+      },
+      "component": {"componentId": "external-regtech", "category": "external", "zoneId": null},
+      "container": {"zoneId": "oa-baremetal", "containerType": "zone"},
+      "expectAllowed": false,
+      "expectViolationRuleId": "deny-external-in-oa-baremetal"
+    },
+    {
+      "id": "containment-default-allow-unknown",
+      "type": "containment",
+      "schema": {
+        "policies": {"containment": {"default": "allow"}},
+        "rules": {"containmentRules": []}
+      },
+      "component": {"componentId": "backend-fastapi", "category": "backend", "zoneId": null},
+      "container": {"zoneId": "oa-private-cloud", "containerType": "zone"},
+      "expectAllowed": true
+    }
+  ]
+}

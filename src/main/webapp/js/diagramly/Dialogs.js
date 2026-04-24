@@ -289,6 +289,2297 @@ var StorageDialog = function(editorUi, fn, rowLimit)
 };
 
 /**
+ * Creates a sticky footer bar with a "Save Diagram" button and a storage
+ * info line. Append to any dialog div that uses schema overrides.
+ *
+ * Schema overrides (zones, components, categories, styles, validation rules,
+ * firewall rules) are stored as the attribute "archSchemaOverrides" on the
+ * current diagram page's XML node. They travel with the .drawio file and
+ * survive browser restarts — BUT only after you save the file.
+ * Use the "Save Diagram" button below to persist all pending changes.
+ */
+function makeSaveDiagramBar(editorUi)
+{
+	var bar = document.createElement('div');
+	bar.style.flexShrink = '0';
+	bar.style.marginTop = '8px';
+	bar.style.paddingTop = '8px';
+	bar.style.borderTop = '1px solid rgba(255,255,255,0.12)';
+	bar.style.display = 'flex';
+	bar.style.alignItems = 'center';
+	bar.style.gap = '10px';
+
+	var info = document.createElement('span');
+	info.style.fontSize = '11px';
+	info.style.color = '#888';
+	info.style.flex = '1';
+	info.innerHTML = '&#128190; Changes are stored in the <b>.drawio file</b>. ' +
+		'They will be lost on refresh unless the diagram is saved.';
+	bar.appendChild(info);
+
+	var saveBtn = mxUtils.button('Save Diagram', function()
+	{
+		try
+		{
+			var saveAction = editorUi.actions.get('save');
+
+			if (saveAction != null)
+			{
+				saveAction.funct();
+			}
+			else
+			{
+				editorUi.saveFile(false);
+			}
+		}
+		catch (e)
+		{
+			editorUi.showError('Error', 'Could not save: ' + e.message, 'OK');
+		}
+	});
+	saveBtn.className = 'geBtn';
+	saveBtn.style.fontWeight = '600';
+	saveBtn.style.background = '#4a9eff';
+	saveBtn.style.color = '#fff';
+	saveBtn.style.border = 'none';
+	saveBtn.style.flexShrink = '0';
+	bar.appendChild(saveBtn);
+
+	return bar;
+}
+
+var ValidationRulesDialog = function(editorUi)
+{
+	var div = document.createElement('div');
+	div.style.width = '100%';
+	div.style.height = '100%';
+	div.style.boxSizing = 'border-box';
+	div.style.display = 'flex';
+	div.style.flexDirection = 'column';
+
+	var graph = editorUi.editor.graph;
+	var reg = window.ArchitectureSchemaRegistry;
+
+	// overrides: the raw per-diagram override object stored on the page node.
+	// This is the single source of truth we read from and write to.
+	// We never mix effective (merged) rule objects back into overrides, which
+	// was the root cause of deleted rules reappearing after Save Rules.
+	var overrides = (reg != null) ? (reg.getOverrides(editorUi) || {}) : {};
+	console.log('[ValidationRulesDialog] opened. overrides at open time:', JSON.stringify(overrides, null, 2));
+
+	var baseSchema = (reg != null) ? reg.getBase() : null;
+	var baseRules = (baseSchema != null && baseSchema.rules != null) ?
+		baseSchema.rules : {edgeRules: [], containmentRules: []};
+
+	// Build a set of ids that exist in the base schema for a given section.
+	// Used to decide whether to emit a tombstone on delete.
+	function buildBaseIdSet(section)
+	{
+		var arr = (baseRules[section] || []);
+		var set = {};
+		for (var i = 0; i < arr.length; i++) { if (arr[i] && arr[i].id) set[arr[i].id] = true; }
+		return set;
+	}
+
+	// Return the current effective (display) rules for the selected section.
+	// We always derive this fresh from the registry so it reflects the
+	// latest merged state (base + overrides), not a stale workingRules copy.
+	function effectiveSection()
+	{
+		var eff = (reg != null) ? reg.getEffective() : null;
+		var rules = (eff != null && eff.rules != null) ? eff.rules : {edgeRules: [], containmentRules: []};
+		return rules[sectionSelect.value] || [];
+	}
+
+	// Commit overrides to the registry and refresh the graph schema.
+	// This is the only place that touches setOverrides — keeping overrides
+	// as the canonical store and never copying effective rules back into it.
+	function commitOverrides()
+	{
+		console.group('[ValidationRulesDialog] commitOverrides');
+		console.log('  overrides being committed:', JSON.stringify(overrides, null, 2));
+
+		if (reg != null)
+		{
+			reg.setOverrides(editorUi, overrides);
+			var newEff = reg.getEffective();
+			console.log('  effective edgeRules after commit:', JSON.stringify(newEff && newEff.rules && newEff.rules.edgeRules));
+
+			if (graph.setArchitectureSchema != null)
+			{
+				graph.setArchitectureSchema(newEff);
+			}
+		}
+		else
+		{
+			console.error('[ValidationRulesDialog] commitOverrides: ArchitectureSchemaRegistry is NULL');
+		}
+
+		console.groupEnd();
+	}
+
+	// Ensure overrides.rules[section] exists as an array and return it.
+	function getOrCreateOverrideSection(section)
+	{
+		overrides.rules = overrides.rules || {};
+		overrides.rules[section] = overrides.rules[section] || [];
+		return overrides.rules[section];
+	}
+
+	// ----- UI -----
+
+	function createButton(label, fn)
+	{
+		var btn = mxUtils.button(label, fn);
+		btn.className = 'geBtn';
+		return btn;
+	}
+
+	var title = document.createElement('h3');
+	title.style.marginTop = '0px';
+	title.style.marginBottom = '8px';
+	title.style.textAlign = 'center';
+	title.style.flexShrink = '0';
+	mxUtils.write(title, 'Validation Rules');
+	div.appendChild(title);
+
+	var toolbar = document.createElement('div');
+	toolbar.style.marginBottom = '8px';
+	toolbar.style.display = 'flex';
+	toolbar.style.alignItems = 'center';
+	toolbar.style.gap = '6px';
+	toolbar.style.flexShrink = '0';
+
+	var sectionSelect = document.createElement('select');
+	sectionSelect.style.height = '28px';
+	sectionSelect.style.marginRight = '4px';
+	var optEdge = document.createElement('option');
+	optEdge.value = 'edgeRules'; optEdge.text = 'Edge Rules';
+	sectionSelect.appendChild(optEdge);
+	var optContainment = document.createElement('option');
+	optContainment.value = 'containmentRules'; optContainment.text = 'Containment Rules';
+	sectionSelect.appendChild(optContainment);
+	toolbar.appendChild(sectionSelect);
+	div.appendChild(toolbar);
+
+	// Rule list — scrollable, flex-grows to fill space
+	var listWrap = document.createElement('div');
+	listWrap.style.border = '1px solid rgba(255,255,255,0.15)';
+	listWrap.style.flex = '1 1 0';
+	listWrap.style.minHeight = '60px';
+	listWrap.style.overflow = 'auto';
+	listWrap.style.marginBottom = '8px';
+	div.appendChild(listWrap);
+
+	// JSON editor panel — fixed height
+	var editorPanel = document.createElement('div');
+	editorPanel.style.flexShrink = '0';
+	editorPanel.style.display = 'flex';
+	editorPanel.style.flexDirection = 'column';
+	editorPanel.style.height = '220px';
+
+	var editorLabel = document.createElement('div');
+	editorLabel.style.fontWeight = 'bold';
+	editorLabel.style.marginBottom = '4px';
+	editorLabel.style.fontSize = '12px';
+	mxUtils.write(editorLabel, 'Rule JSON (select a rule above to edit):');
+	editorPanel.appendChild(editorLabel);
+
+	var textarea = document.createElement('textarea');
+	textarea.style.flex = '1 1 0';
+	textarea.style.width = '100%';
+	textarea.style.resize = 'none';
+	textarea.style.boxSizing = 'border-box';
+	textarea.style.background = 'transparent';
+	textarea.style.color = 'inherit';
+	textarea.style.border = '1px solid rgba(255,255,255,0.2)';
+	textarea.style.padding = '6px';
+	textarea.style.fontFamily = 'monospace';
+	textarea.style.fontSize = '11px';
+	editorPanel.appendChild(textarea);
+
+	var btnRow = document.createElement('div');
+	btnRow.style.display = 'flex';
+	btnRow.style.gap = '6px';
+	btnRow.style.marginTop = '6px';
+	btnRow.style.flexShrink = '0';
+	editorPanel.appendChild(btnRow);
+	div.appendChild(editorPanel);
+
+	var selectedRuleId = null;
+
+	function setEditorValue(rule)
+	{
+		textarea.value = (rule != null) ? JSON.stringify(rule, null, 2) : '';
+	}
+
+	function renderRuleList()
+	{
+		listWrap.innerHTML = '';
+		var rules = effectiveSection();
+		console.log('[ValidationRulesDialog] renderRuleList — section:', sectionSelect.value, '— rules:', JSON.stringify(rules.map(function(r){ return r.id; })));
+
+		for (var i = 0; i < rules.length; i++)
+		{
+			(function(rule)
+			{
+				var row = document.createElement('div');
+				row.style.padding = '6px 8px';
+				row.style.borderBottom = '1px solid rgba(255,255,255,0.07)';
+				row.style.cursor = 'pointer';
+				row.style.fontSize = '12px';
+				row.style.background = (rule.id === selectedRuleId) ? 'rgba(74,158,255,0.18)' : '';
+				mxUtils.write(row, (rule.id || 'unnamed') + ' [' + (rule.effect || 'allow') + ']' +
+					(rule.enabled === false ? ' — disabled' : ''));
+
+				mxEvent.addListener(row, 'click', function()
+				{
+					selectedRuleId = rule.id;
+					setEditorValue(rule);
+					renderRuleList();
+				});
+
+				listWrap.appendChild(row);
+			})(rules[i]);
+		}
+
+		if (rules.length === 0)
+		{
+			var empty = document.createElement('div');
+			empty.style.padding = '8px';
+			empty.style.color = '#888';
+			empty.style.fontSize = '12px';
+			mxUtils.write(empty, 'No rules in this section.');
+			listWrap.appendChild(empty);
+		}
+	}
+
+	// New rule
+	toolbar.appendChild(createButton('New', function()
+	{
+		var idPrefix = (sectionSelect.value === 'edgeRules') ? 'edge-rule-' : 'containment-rule-';
+		var rule = {
+			id: idPrefix + (new Date().getTime()),
+			enabled: true,
+			effect: 'deny',
+			priority: 50,
+			severity: 'error',
+			when: {},
+			message: ''
+		};
+		var ovSection = getOrCreateOverrideSection(sectionSelect.value);
+		ovSection.push(rule);
+		commitOverrides();
+		selectedRuleId = rule.id;
+		setEditorValue(rule);
+		renderRuleList();
+	}));
+
+	// Delete selected rule
+	toolbar.appendChild(createButton('Delete', function()
+	{
+		if (selectedRuleId == null)
+		{
+			editorUi.showError(mxResources.get('error'), 'Select a rule first.', mxResources.get('ok'));
+			return;
+		}
+
+		var ruleId = selectedRuleId;
+
+		editorUi.confirm('Delete rule "' + ruleId + '"?', function()
+		{
+			var section = sectionSelect.value;
+			var baseIdSet = buildBaseIdSet(section);
+
+			console.group('[ValidationRulesDialog] DELETE confirmed for rule: ' + ruleId);
+			console.log('  section:', section);
+			console.log('  baseIdSet:', JSON.stringify(baseIdSet));
+			console.log('  isBaseRule:', !!baseIdSet[ruleId]);
+			console.log('  overrides BEFORE delete:', JSON.stringify(overrides, null, 2));
+
+			var ovSection = getOrCreateOverrideSection(section);
+
+			// Remove any existing override entry for this id (including prior tombstones)
+			for (var i = ovSection.length - 1; i >= 0; i--)
+			{
+				if (ovSection[i] && ovSection[i].id === ruleId) { ovSection.splice(i, 1); }
+			}
+
+			// If the rule exists in the base schema, add a tombstone so mergeById removes it
+			if (baseIdSet[ruleId])
+			{
+				ovSection.push({id: ruleId, _delete: true});
+				console.log('  → added _delete tombstone for base rule');
+			}
+			else
+			{
+				console.log('  → rule not in base, just removed from overrides (was custom)');
+			}
+
+			console.log('  overrides AFTER delete (before commit):', JSON.stringify(overrides, null, 2));
+			console.groupEnd();
+
+			commitOverrides();
+			selectedRuleId = null;
+			setEditorValue(null);
+			renderRuleList();
+		});
+	}));
+
+	// Apply JSON: update a rule via the textarea editor
+	btnRow.appendChild(createButton('Apply JSON', function()
+	{
+		if (selectedRuleId == null)
+		{
+			editorUi.showError(mxResources.get('error'), 'Select a rule first.', mxResources.get('ok'));
+			return;
+		}
+
+		try
+		{
+			var parsed = JSON.parse(textarea.value);
+
+			if (parsed == null || parsed.id == null)
+			{
+				throw new Error('Rule requires an id field.');
+			}
+
+			var section = sectionSelect.value;
+			var baseIdSet = buildBaseIdSet(section);
+			var ovSection = getOrCreateOverrideSection(section);
+
+			// Remove any existing override entry for the old id
+			for (var i = ovSection.length - 1; i >= 0; i--)
+			{
+				if (ovSection[i] && ovSection[i].id === selectedRuleId) { ovSection.splice(i, 1); }
+			}
+
+			// If the id changed and the old id was a base rule, tombstone it
+			if (parsed.id !== selectedRuleId && baseIdSet[selectedRuleId])
+			{
+				ovSection.push({id: selectedRuleId, _delete: true});
+			}
+
+			ovSection.push(parsed);
+			commitOverrides();
+			selectedRuleId = parsed.id;
+			renderRuleList();
+		}
+		catch (e)
+		{
+			editorUi.showError(mxResources.get('error'), e.message, mxResources.get('ok'));
+		}
+	}));
+
+	// Save Rules: commit overrides and save the diagram file
+	var saveBtn = createButton('Save Rules', function()
+	{
+		commitOverrides();
+
+		try
+		{
+			var saveAction = editorUi.actions.get('save');
+			if (saveAction != null) { saveAction.funct(); }
+			else { editorUi.saveFile(false); }
+		}
+		catch (e) {}
+
+		editorUi.showError('Saved', 'Validation rules saved.', mxResources.get('ok'));
+	});
+	saveBtn.style.fontWeight = '600';
+	saveBtn.style.background = '#4a9eff';
+	saveBtn.style.color = '#fff';
+	saveBtn.style.border = 'none';
+	btnRow.appendChild(saveBtn);
+
+	mxEvent.addListener(sectionSelect, 'change', function()
+	{
+		selectedRuleId = null;
+		setEditorValue(null);
+		renderRuleList();
+	});
+
+	sectionSelect.value = 'edgeRules';
+	renderRuleList();
+
+	div.appendChild(makeSaveDiagramBar(editorUi));
+
+	this.container = div;
+	this.init = function() {};
+	this.save = function() { commitOverrides(); };
+};
+
+var ValidationSelfTestDialog = function(editorUi, results)
+{
+	results = results || [];
+	
+	var div = document.createElement('div');
+	div.style.width = '100%';
+	div.style.height = '100%';
+	div.style.boxSizing = 'border-box';
+	
+	var title = document.createElement('h3');
+	title.style.textAlign = 'center';
+	title.style.marginTop = '0px';
+	mxUtils.write(title, 'Validation Self Test');
+	div.appendChild(title);
+	
+	var passed = 0;
+	
+	for (var i = 0; i < results.length; i++)
+	{
+		if (results[i].pass)
+		{
+			passed++;
+		}
+	}
+	
+	var summary = document.createElement('div');
+	summary.style.marginBottom = '8px';
+	summary.style.padding = '6px';
+	summary.style.border = '1px solid rgba(255,255,255,0.15)';
+	summary.style.color = (passed == results.length) ? '#7ef0a0' : '#f08080';
+	mxUtils.write(summary, 'Passed ' + passed + ' / ' + results.length + ' fixture checks');
+	div.appendChild(summary);
+	
+	var table = document.createElement('div');
+	table.style.border = '1px solid rgba(255,255,255,0.15)';
+	table.style.height = '300px';
+	table.style.overflow = 'auto';
+	table.style.fontSize = '12px';
+	div.appendChild(table);
+	
+	for (var j = 0; j < results.length; j++)
+	{
+		var row = document.createElement('div');
+		row.style.borderBottom = '1px solid rgba(255,255,255,0.08)';
+		row.style.padding = '8px';
+		row.style.background = results[j].pass ? 'rgba(0,200,80,0.08)' : 'rgba(220,50,50,0.1)';
+		
+		var name = document.createElement('div');
+		name.style.fontWeight = 'bold';
+		mxUtils.write(name, (results[j].pass ? 'PASS: ' : 'FAIL: ') + results[j].id);
+		row.appendChild(name);
+		
+		var detail = document.createElement('div');
+		detail.style.marginTop = '4px';
+		detail.style.color = '#444';
+		mxUtils.write(detail, (results[j].result != null) ?
+			('allowed=' + results[j].result.allowed + ', violations=' +
+			((results[j].result.violations != null) ? results[j].result.violations.length : 0)) :
+			'No result.');
+		row.appendChild(detail);
+		
+		table.appendChild(row);
+	}
+	
+	this.container = div;
+	this.init = function() {};
+};
+
+/**
+ * Generic JSON preview dialog.
+ *
+ * @param {object} editorUi
+ * @param {string} titleText   - Dialog heading text.
+ * @param {*}      jsonData    - Any value serialised with JSON.stringify.
+ * @param {string} filename    - Suggested download filename (without extension).
+ * @param {string} [summaryHtml] - Optional HTML banner shown above the textarea.
+ */
+var JsonExportPreviewDialog = function(editorUi, titleText, jsonData, filename, summaryHtml)
+{
+	var jsonString = JSON.stringify(jsonData, null, 2);
+
+	var div = document.createElement('div');
+	div.style.width = '100%';
+	div.style.height = '100%';
+	div.style.boxSizing = 'border-box';
+	div.style.display = 'flex';
+	div.style.flexDirection = 'column';
+
+	// Title
+	var titleEl = document.createElement('h3');
+	titleEl.style.textAlign = 'center';
+	titleEl.style.margin = '0 0 8px 0';
+	titleEl.style.flexShrink = '0';
+	mxUtils.write(titleEl, titleText || 'JSON Export');
+	div.appendChild(titleEl);
+
+	// Optional summary banner
+	if (summaryHtml != null && summaryHtml !== '')
+	{
+		var banner = document.createElement('div');
+		banner.style.marginBottom = '8px';
+		banner.style.padding = '6px 10px';
+		banner.style.border = '1px solid rgba(255,255,255,0.15)';
+		banner.style.borderRadius = '3px';
+		banner.style.fontSize = '12px';
+		banner.style.flexShrink = '0';
+		banner.innerHTML = summaryHtml;
+		div.appendChild(banner);
+	}
+
+	// Textarea
+	var textarea = document.createElement('textarea');
+	textarea.readOnly = true;
+	textarea.value = jsonString;
+	textarea.style.flex = '1 1 auto';
+	textarea.style.width = '100%';
+	textarea.style.boxSizing = 'border-box';
+	textarea.style.fontFamily = 'monospace';
+	textarea.style.fontSize = '11px';
+	textarea.style.resize = 'none';
+	textarea.style.border = '1px solid rgba(255,255,255,0.15)';
+	textarea.style.borderRadius = '3px';
+	textarea.style.padding = '8px';
+	textarea.style.background = 'transparent';
+	textarea.style.color = 'inherit';
+	div.appendChild(textarea);
+
+	// Buttons
+	var btns = document.createElement('div');
+	btns.style.display = 'flex';
+	btns.style.gap = '8px';
+	btns.style.marginTop = '10px';
+	btns.style.flexShrink = '0';
+
+	var copyBtn = document.createElement('button');
+	copyBtn.style.flex = '1';
+	copyBtn.style.padding = '6px';
+	mxUtils.write(copyBtn, 'Copy to Clipboard');
+
+	mxEvent.addListener(copyBtn, 'click', function()
+	{
+		try
+		{
+			if (navigator.clipboard && navigator.clipboard.writeText)
+			{
+				navigator.clipboard.writeText(jsonString).then(function()
+				{
+					mxUtils.write(copyBtn, 'Copied!');
+					window.setTimeout(function() { copyBtn.innerHTML = ''; mxUtils.write(copyBtn, 'Copy to Clipboard'); }, 1500);
+				});
+			}
+			else
+			{
+				textarea.select();
+				document.execCommand('copy');
+				mxUtils.write(copyBtn, 'Copied!');
+				window.setTimeout(function() { copyBtn.innerHTML = ''; mxUtils.write(copyBtn, 'Copy to Clipboard'); }, 1500);
+			}
+		}
+		catch (e) { /* ignore */ }
+	});
+
+	btns.appendChild(copyBtn);
+
+	var dlBtn = document.createElement('button');
+	dlBtn.style.flex = '1';
+	dlBtn.style.padding = '6px';
+	mxUtils.write(dlBtn, 'Download .json');
+
+	mxEvent.addListener(dlBtn, 'click', function()
+	{
+		var safeFilename = (filename || 'export') + '.json';
+
+		try
+		{
+			var blob = new Blob([jsonString], { type: 'application/json' });
+			var url  = URL.createObjectURL(blob);
+			var a    = document.createElement('a');
+			a.href     = url;
+			a.download = safeFilename;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(url);
+		}
+		catch (e)
+		{
+			// Fallback for older browsers
+			if (editorUi.saveData != null)
+			{
+				editorUi.saveData(safeFilename, 'json', jsonString, 'application/json');
+			}
+		}
+	});
+
+	btns.appendChild(dlBtn);
+	div.appendChild(btns);
+
+	this.container = div;
+
+	this.init = function()
+	{
+		window.setTimeout(function()
+		{
+			textarea.scrollTop = 0;
+		}, 10);
+	};
+};
+
+/**
+ * Preview + download dialog for native .drawio XML exports.
+ * Shows the raw XML and downloads with a .drawio extension so the file
+ * can be dragged and dropped directly back into draw.io.
+ */
+var DrawioExportPreviewDialog = function(editorUi, titleText, xmlString, filenameBase)
+{
+	var div = document.createElement('div');
+	div.style.width = '100%';
+	div.style.height = '100%';
+	div.style.boxSizing = 'border-box';
+	div.style.display = 'flex';
+	div.style.flexDirection = 'column';
+
+	var titleEl = document.createElement('h3');
+	titleEl.style.textAlign = 'center';
+	titleEl.style.margin = '0 0 8px 0';
+	titleEl.style.flexShrink = '0';
+	mxUtils.write(titleEl, titleText || 'Export Diagram');
+	div.appendChild(titleEl);
+
+	var info = document.createElement('div');
+	info.style.fontSize = '11px';
+	info.style.color = '#888';
+	info.style.marginBottom = '8px';
+	info.style.flexShrink = '0';
+	mxUtils.write(info, '');
+	div.appendChild(info);
+
+	var textarea = document.createElement('textarea');
+	textarea.readOnly = true;
+	textarea.value = xmlString;
+	textarea.style.flex = '1 1 auto';
+	textarea.style.width = '100%';
+	textarea.style.boxSizing = 'border-box';
+	textarea.style.fontFamily = 'monospace';
+	textarea.style.fontSize = '11px';
+	textarea.style.resize = 'none';
+	textarea.style.border = '1px solid rgba(255,255,255,0.15)';
+	textarea.style.borderRadius = '3px';
+	textarea.style.padding = '8px';
+	textarea.style.background = 'transparent';
+	textarea.style.color = 'inherit';
+	div.appendChild(textarea);
+
+	var btns = document.createElement('div');
+	btns.style.display = 'flex';
+	btns.style.gap = '8px';
+	btns.style.marginTop = '10px';
+	btns.style.flexShrink = '0';
+
+	var copyBtn = document.createElement('button');
+	copyBtn.style.flex = '1';
+	copyBtn.style.padding = '6px';
+	mxUtils.write(copyBtn, 'Copy to Clipboard');
+	mxEvent.addListener(copyBtn, 'click', function()
+	{
+		try
+		{
+			if (navigator.clipboard && navigator.clipboard.writeText)
+			{
+				navigator.clipboard.writeText(xmlString).then(function()
+				{
+					copyBtn.innerHTML = '';
+					mxUtils.write(copyBtn, 'Copied!');
+					window.setTimeout(function() { copyBtn.innerHTML = ''; mxUtils.write(copyBtn, 'Copy to Clipboard'); }, 1500);
+				});
+			}
+			else
+			{
+				textarea.select();
+				document.execCommand('copy');
+				copyBtn.innerHTML = '';
+				mxUtils.write(copyBtn, 'Copied!');
+				window.setTimeout(function() { copyBtn.innerHTML = ''; mxUtils.write(copyBtn, 'Copy to Clipboard'); }, 1500);
+			}
+		}
+		catch (e) { /* ignore */ }
+	});
+	btns.appendChild(copyBtn);
+
+	var dlBtn = document.createElement('button');
+	dlBtn.style.flex = '1';
+	dlBtn.style.padding = '6px';
+	dlBtn.style.fontWeight = '600';
+	dlBtn.style.background = '#4a9eff';
+	dlBtn.style.color = '#fff';
+	dlBtn.style.border = 'none';
+	dlBtn.style.borderRadius = '3px';
+	dlBtn.style.cursor = 'pointer';
+	mxUtils.write(dlBtn, 'Download .drawio');
+	mxEvent.addListener(dlBtn, 'click', function()
+	{
+		var safeFilename = (filenameBase || 'diagram') + '.drawio';
+
+		try
+		{
+			var blob = new Blob([xmlString], {type: 'application/xml'});
+			var url  = URL.createObjectURL(blob);
+			var a    = document.createElement('a');
+			a.href     = url;
+			a.download = safeFilename;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(url);
+		}
+		catch (e)
+		{
+			if (editorUi.saveData != null)
+			{
+				editorUi.saveData(safeFilename, 'drawio', xmlString, 'application/xml');
+			}
+		}
+	});
+	btns.appendChild(dlBtn);
+	div.appendChild(btns);
+
+	this.container = div;
+	this.init = function()
+	{
+		window.setTimeout(function() { textarea.scrollTop = 0; }, 10);
+	};
+};
+
+var AddArchitectureEntriesDialog = function(editorUi)
+{
+	var div = document.createElement('div');
+	div.style.width = '100%';
+	div.style.height = '100%';
+	div.style.boxSizing = 'border-box';
+	div.style.whiteSpace = 'nowrap';
+	
+	var title = document.createElement('h3');
+	title.style.textAlign = 'center';
+	title.style.marginTop = '0px';
+	mxUtils.write(title, 'Add Zones / Components');
+	div.appendChild(title);
+	
+	var registry = window.ArchitectureSchemaRegistry;
+	var graph = editorUi.editor.graph;
+	var schema = (registry != null) ? (registry.getEffective() || registry.loadSync(editorUi)) : null;
+	var overrides = (registry != null) ? (registry.getOverrides(editorUi) || {}) : {};
+	var workingZones = JSON.parse(JSON.stringify(overrides.zones || []));
+	var workingComponents = JSON.parse(JSON.stringify(overrides.components || []));
+	
+	var categories = (schema != null && schema.componentCategories != null) ? schema.componentCategories : [];
+	
+	var controls = document.createElement('div');
+	controls.style.marginBottom = '8px';
+	div.appendChild(controls);
+	
+	var modeSelect = document.createElement('select');
+	modeSelect.style.height = '28px';
+	modeSelect.style.marginRight = '8px';
+	var zoneOpt = document.createElement('option');
+	zoneOpt.value = 'zone';
+	zoneOpt.text = 'Architecture / Zones';
+	modeSelect.appendChild(zoneOpt);
+	var componentOpt = document.createElement('option');
+	componentOpt.value = 'component';
+	componentOpt.text = 'Architecture / Components';
+	modeSelect.appendChild(componentOpt);
+	controls.appendChild(modeSelect);
+	
+	function createTextInput(placeholder)
+	{
+		var input = document.createElement('input');
+		input.type = 'text';
+		input.placeholder = placeholder;
+		input.style.height = '28px';
+		input.style.marginRight = '6px';
+		input.style.padding = '0 8px';
+		input.style.width = '170px';
+		return input;
+	}
+	
+	var idInput = createTextInput('id');
+	var nameInput = createTextInput('name/label');
+	var extraInput = createTextInput('category or styleRef');
+	controls.appendChild(idInput);
+	controls.appendChild(nameInput);
+	controls.appendChild(extraInput);
+	
+	var categorySelect = document.createElement('select');
+	categorySelect.style.height = '28px';
+	categorySelect.style.marginRight = '6px';
+	categorySelect.style.display = 'none';
+	
+	for (var c = 0; c < categories.length; c++)
+	{
+		var opt = document.createElement('option');
+		opt.value = categories[c].id;
+		opt.text = categories[c].name || categories[c].id;
+		categorySelect.appendChild(opt);
+	}
+	
+	controls.appendChild(categorySelect);
+	
+	function sanitizeId(value)
+	{
+		return (value || '').toLowerCase().replace(/[^a-z0-9\-]+/g, '-').replace(/^-+|-+$/g, '');
+	}
+	
+	function upsertById(list, entry)
+	{
+		for (var i = 0; i < list.length; i++)
+		{
+			if (list[i] != null && list[i].id === entry.id)
+			{
+				list[i] = entry;
+				return;
+			}
+		}
+		
+		list.push(entry);
+	}
+	
+	var addBtn = mxUtils.button('Add', function()
+	{
+		var rawId = (idInput.value || '').trim();
+		var id = sanitizeId(rawId);
+		
+		if (id.length === 0)
+		{
+			editorUi.showError(mxResources.get('error'), 'ID is required.', mxResources.get('ok'));
+			return;
+		}
+		
+		if (modeSelect.value === 'zone')
+		{
+			var zoneName = (nameInput.value || '').trim();
+			
+			if (zoneName.length === 0)
+			{
+				editorUi.showError(mxResources.get('error'), 'Zone name is required.', mxResources.get('ok'));
+				return;
+			}
+			
+			var zone = {
+				id: id,
+				name: zoneName,
+				editable: true
+			};
+			
+			var maybeStyleRef = (extraInput.value || '').trim();
+			
+			if (maybeStyleRef.length > 0)
+			{
+				zone.styleRef = maybeStyleRef;
+			}
+			
+			upsertById(workingZones, zone);
+		}
+		else
+		{
+			var label = (nameInput.value || '').trim();
+			
+			if (label.length === 0)
+			{
+				editorUi.showError(mxResources.get('error'), 'Component label is required.', mxResources.get('ok'));
+				return;
+			}
+			
+			var category = (categorySelect.value || '').trim();
+			
+			if (category.length === 0)
+			{
+				editorUi.showError(mxResources.get('error'), 'Component category is required.', mxResources.get('ok'));
+				return;
+			}
+			
+			var component = {
+				id: id,
+				label: label,
+				category: category
+			};
+			
+			var maybeShapeRef = (extraInput.value || '').trim();
+			
+			if (maybeShapeRef.length > 0)
+			{
+				component.shapeRef = maybeShapeRef;
+			}
+			
+			upsertById(workingComponents, component);
+		}
+		
+		renderList();
+	});
+	addBtn.className = 'geBtn';
+	controls.appendChild(addBtn);
+	
+	var listWrap = document.createElement('div');
+	listWrap.style.height = '300px';
+	listWrap.style.overflow = 'auto';
+	listWrap.style.border = '1px solid #d0d0d0';
+	listWrap.style.padding = '4px';
+	div.appendChild(listWrap);
+	
+	var selectedId = null;
+	var removeBtn = mxUtils.button('Remove Selected', function()
+	{
+		if (selectedId == null)
+		{
+			return;
+		}
+		
+		var list = (modeSelect.value === 'zone') ? workingZones : workingComponents;
+		
+		for (var i = list.length - 1; i >= 0; i--)
+		{
+			if (list[i] != null && list[i].id === selectedId)
+			{
+				list.splice(i, 1);
+			}
+		}
+		
+		selectedId = null;
+		renderList();
+	});
+	removeBtn.className = 'geBtn';
+	removeBtn.style.marginTop = '8px';
+	div.appendChild(removeBtn);
+	
+	function renderList()
+	{
+		listWrap.innerHTML = '';
+		var list = (modeSelect.value === 'zone') ? workingZones : workingComponents;
+		
+		if (list.length === 0)
+		{
+			var empty = document.createElement('div');
+			empty.style.padding = '8px';
+			empty.style.color = '#666';
+			mxUtils.write(empty, 'No custom entries yet.');
+			listWrap.appendChild(empty);
+			return;
+		}
+		
+		for (var i = 0; i < list.length; i++)
+		{
+			(function(entry)
+			{
+				var row = document.createElement('div');
+				row.style.padding = '6px';
+				row.style.borderBottom = '1px solid #efefef';
+				row.style.cursor = 'pointer';
+				row.style.background = (selectedId === entry.id) ? '#f3f7ff' : '';
+				mxUtils.write(row, entry.id + ' - ' + (entry.name || entry.label || ''));
+				
+				mxEvent.addListener(row, 'click', function()
+				{
+					selectedId = entry.id;
+					renderList();
+				});
+				
+				listWrap.appendChild(row);
+			})(list[i]);
+		}
+	}
+	
+	function syncModeUi()
+	{
+		if (modeSelect.value === 'zone')
+		{
+			nameInput.placeholder = 'zone name';
+			extraInput.placeholder = 'styleRef (optional)';
+			extraInput.style.display = '';
+			categorySelect.style.display = 'none';
+		}
+		else
+		{
+			nameInput.placeholder = 'component label';
+			extraInput.placeholder = 'shapeRef (optional)';
+			extraInput.style.display = '';
+			categorySelect.style.display = '';
+		}
+		
+		selectedId = null;
+		renderList();
+	}
+	
+	mxEvent.addListener(modeSelect, 'change', syncModeUi);
+	syncModeUi();
+	
+	this.container = div;
+	this.init = function() {};
+	this.save = function()
+	{
+		if (registry == null)
+		{
+			return;
+		}
+		
+		overrides.zones = workingZones;
+		overrides.components = workingComponents;
+		registry.setOverrides(editorUi, overrides);
+		graph.setArchitectureSchema(registry.getEffective());
+		editorUi.refreshArchitectureSchema();
+		
+		if (editorUi.sidebar != null && editorUi.sidebar.addArchitecturePalette != null)
+		{
+			editorUi.sidebar.removePalette('architectureZones');
+			editorUi.sidebar.removePalette('architectureComponents');
+			editorUi.sidebar.addArchitecturePalette();
+		}
+	};
+};
+
+var ArchitectureCatalogDialog = function(editorUi)
+{
+	var div = document.createElement('div');
+	div.style.width = '100%';
+	div.style.height = '100%';
+	div.style.boxSizing = 'border-box';
+	div.style.display = 'flex';
+	div.style.flexDirection = 'column';
+	
+	var title = document.createElement('h3');
+	title.style.textAlign = 'center';
+	title.style.marginTop = '0px';
+	title.style.flexShrink = '0';
+	mxUtils.write(title, 'Architecture Admin');
+	div.appendChild(title);
+	
+	var registry = window.ArchitectureSchemaRegistry;
+	var schema = (registry != null) ? (registry.getEffective() || registry.loadSync(editorUi)) : null;
+	var base = (registry != null) ? registry.getBase() : null;
+	var overrides = (registry != null) ? (registry.getOverrides(editorUi) || {}) : {};
+	
+	if (schema == null)
+	{
+		var err = document.createElement('div');
+		err.style.padding = '12px';
+		mxUtils.write(err, 'Architecture schema is not available.');
+		div.appendChild(err);
+		this.container = div;
+		this.init = function() {};
+		return;
+	}
+	
+	var toolbar = document.createElement('div');
+	toolbar.style.marginBottom = '8px';
+	toolbar.style.display = 'flex';
+	toolbar.style.alignItems = 'center';
+	toolbar.style.gap = '8px';
+	toolbar.style.flexShrink = '0';
+	div.appendChild(toolbar);
+	
+	var tabSelect = document.createElement('select');
+	tabSelect.style.height = '28px';
+	
+	var tabs = [
+		{value: 'zones', label: 'Zones'},
+		{value: 'components', label: 'Components'},
+		{value: 'categories', label: 'Categories'},
+		{value: 'styles', label: 'Styles'},
+		{value: 'firewallRules', label: 'Firewall Rules'}
+	];
+	
+	for (var t = 0; t < tabs.length; t++)
+	{
+		var opt = document.createElement('option');
+		opt.value = tabs[t].value;
+		opt.text = tabs[t].label;
+		tabSelect.appendChild(opt);
+	}
+	
+	toolbar.appendChild(tabSelect);
+	
+	var searchInput = document.createElement('input');
+	searchInput.type = 'text';
+	searchInput.placeholder = 'Filter by id, name, category...';
+	searchInput.style.height = '26px';
+	searchInput.style.padding = '0 8px';
+	searchInput.style.width = '280px';
+	toolbar.appendChild(searchInput);
+	
+	var addButton = mxUtils.button('+ Add New', function()
+	{
+		if (tabSelect.value === 'firewallRules')
+		{
+			showFwRuleEditor(null);
+		}
+		else
+		{
+			showEditor(null);
+		}
+	});
+	addButton.style.height = '28px';
+	toolbar.appendChild(addButton);
+	
+	var countLabel = document.createElement('span');
+	countLabel.style.color = '#666';
+	countLabel.style.fontSize = '12px';
+	countLabel.style.marginLeft = 'auto';
+	toolbar.appendChild(countLabel);
+	
+	var tableWrap = document.createElement('div');
+	tableWrap.style.border = '1px solid rgba(255,255,255,0.15)';
+	tableWrap.style.flex = '1 1 0';
+	tableWrap.style.minHeight = '80px';
+	tableWrap.style.overflow = 'auto';
+	tableWrap.style.fontSize = '12px';
+	div.appendChild(tableWrap);
+	
+	var editorWrap = document.createElement('div');
+	editorWrap.style.marginTop = '10px';
+	editorWrap.style.border = '1px solid rgba(255,255,255,0.15)';
+	editorWrap.style.padding = '10px';
+	editorWrap.style.display = 'none';
+	editorWrap.style.fontSize = '12px';
+	editorWrap.style.overflowY = 'auto';
+	editorWrap.style.flexShrink = '0';
+	editorWrap.style.height = '240px';
+	div.appendChild(editorWrap);
+	
+	var baseIds = {
+		zones: {},
+		components: {},
+		categories: {},
+		styles: {}
+	};
+	
+	if (base != null)
+	{
+		if (base.zones != null)
+		{
+			for (var i = 0; i < base.zones.length; i++)
+			{
+				if (base.zones[i] != null && base.zones[i].id != null)
+				{
+					baseIds.zones[base.zones[i].id] = true;
+				}
+			}
+		}
+		
+		if (base.components != null)
+		{
+			for (var i = 0; i < base.components.length; i++)
+			{
+				if (base.components[i] != null && base.components[i].id != null)
+				{
+					baseIds.components[base.components[i].id] = true;
+				}
+			}
+		}
+		
+		if (base.componentCategories != null)
+		{
+			for (var i = 0; i < base.componentCategories.length; i++)
+			{
+				if (base.componentCategories[i] != null && base.componentCategories[i].id != null)
+				{
+					baseIds.categories[base.componentCategories[i].id] = true;
+				}
+			}
+		}
+		
+		if (base.styles != null)
+		{
+			for (var key in base.styles)
+			{
+				if (base.styles.hasOwnProperty(key))
+				{
+					baseIds.styles[key] = true;
+				}
+			}
+		}
+	}
+	
+	overrides.zones = overrides.zones || [];
+	overrides.components = overrides.components || [];
+	overrides.componentCategories = overrides.componentCategories || [];
+	overrides.styles = overrides.styles || {};
+	
+	function sourceLabel(tab, id)
+	{
+		if (baseIds[tab] != null && baseIds[tab][id])
+		{
+			var list = (tab === 'zones') ? overrides.zones :
+				(tab === 'components') ? overrides.components :
+				(tab === 'categories') ? overrides.componentCategories : null;
+			
+			if (list != null)
+			{
+				for (var i = 0; i < list.length; i++)
+				{
+					if (list[i] != null && list[i].id === id && list[i]._delete !== true)
+					{
+						return 'base+override';
+					}
+				}
+			}
+			
+			return 'base';
+		}
+		
+		return 'override';
+	}
+	
+	function getStyleKeys()
+	{
+		var keys = [];
+		var styles = (schema != null) ? schema.styles || {} : {};
+		
+		for (var k in styles)
+		{
+			if (styles.hasOwnProperty(k))
+			{
+				keys.push(k);
+			}
+		}
+		
+		keys.sort();
+		
+		return keys;
+	}
+	
+	function getCategoryList()
+	{
+		return (schema != null) ? (schema.componentCategories || []) : [];
+	}
+	
+	function persist()
+	{
+		if (registry == null)
+		{
+			return;
+		}
+		
+		registry.setOverrides(editorUi, overrides);
+		schema = registry.getEffective();
+		
+		if (editorUi.editor != null && editorUi.editor.graph != null &&
+			editorUi.editor.graph.setArchitectureSchema != null)
+		{
+			editorUi.editor.graph.setArchitectureSchema(schema);
+		}
+		
+		if (editorUi.refreshArchitectureSchema != null)
+		{
+			editorUi.refreshArchitectureSchema();
+		}
+		
+		if (editorUi.sidebar != null && editorUi.sidebar.addArchitecturePalette != null)
+		{
+			editorUi.sidebar.removePalette('architectureZones');
+			editorUi.sidebar.removePalette('architectureComponents');
+			editorUi.sidebar.addArchitecturePalette();
+		}
+	}
+	
+	function upsertOverrideItem(list, item)
+	{
+		for (var i = 0; i < list.length; i++)
+		{
+			if (list[i] != null && list[i].id === item.id)
+			{
+				list[i] = item;
+				return;
+			}
+		}
+		
+		list.push(item);
+	}
+	
+	function removeFromOverrideList(list, id)
+	{
+		for (var i = 0; i < list.length; i++)
+		{
+			if (list[i] != null && list[i].id === id)
+			{
+				list.splice(i, 1);
+				return true;
+			}
+		}
+		
+		return false;
+	}
+	
+	function deleteEntry(tab, id)
+	{
+		if (tab === 'styles')
+		{
+			if (baseIds.styles[id])
+			{
+				overrides.styles[id] = null;
+			}
+			else
+			{
+				delete overrides.styles[id];
+			}
+		}
+		else
+		{
+			var list = (tab === 'zones') ? overrides.zones :
+				(tab === 'components') ? overrides.components :
+				overrides.componentCategories;
+			
+			removeFromOverrideList(list, id);
+			
+			if (baseIds[tab][id])
+			{
+				list.push({id: id, _delete: true});
+			}
+		}
+		
+		persist();
+		renderCurrentTab();
+	}
+	
+	function makeCell(text, opts)
+	{
+		var td = document.createElement('td');
+		td.style.padding = '6px 8px';
+		td.style.borderBottom = '1px solid #efefef';
+		td.style.verticalAlign = 'top';
+		
+		if (opts != null && opts.mono)
+		{
+			td.style.fontFamily = 'monospace';
+		}
+		
+		if (opts != null && opts.wrap)
+		{
+			td.style.whiteSpace = 'pre-wrap';
+			td.style.wordBreak = 'break-all';
+		}
+		else
+		{
+			td.style.whiteSpace = 'nowrap';
+		}
+		
+		if (opts != null && opts.maxWidth != null)
+		{
+			td.style.maxWidth = opts.maxWidth + 'px';
+			td.style.overflow = 'hidden';
+			td.style.textOverflow = 'ellipsis';
+		}
+		
+		mxUtils.write(td, text == null ? '' : String(text));
+		
+		if (opts != null && opts.title)
+		{
+			td.setAttribute('title', text == null ? '' : String(text));
+		}
+		
+		return td;
+	}
+	
+	function makeHeader(text)
+	{
+		var th = document.createElement('th');
+		th.style.textAlign = 'left';
+		th.style.padding = '8px';
+		th.style.borderBottom = '2px solid rgba(255,255,255,0.2)';
+		th.style.position = 'sticky';
+		th.style.top = '0';
+		mxUtils.write(th, text);
+		
+		return th;
+	}
+	
+	function matchesFilter(row, filter)
+	{
+		if (filter == null || filter.length === 0)
+		{
+			return true;
+		}
+		
+		filter = filter.toLowerCase();
+		
+		for (var i = 0; i < row.length; i++)
+		{
+			if (row[i] != null && String(row[i]).toLowerCase().indexOf(filter) >= 0)
+			{
+				return true;
+			}
+		}
+		
+		return false;
+	}
+	
+	function makeActionsCell(tab, id)
+	{
+		var td = document.createElement('td');
+		td.style.padding = '4px 8px';
+		td.style.borderBottom = '1px solid #efefef';
+		td.style.whiteSpace = 'nowrap';
+		
+		var editBtn = mxUtils.button('Edit', function()
+		{
+			showEditor(findEntry(tab, id));
+		});
+		editBtn.style.marginRight = '4px';
+		editBtn.style.padding = '2px 8px';
+		td.appendChild(editBtn);
+		
+		var delBtn = mxUtils.button('Delete', function()
+		{
+			editorUi.confirm('Delete ' + id + ' ?', function()
+			{
+				deleteEntry(tab, id);
+			});
+		});
+		delBtn.style.padding = '2px 8px';
+		td.appendChild(delBtn);
+		
+		return td;
+	}
+	
+	function findEntry(tab, id)
+	{
+		if (tab === 'styles')
+		{
+			return {id: id, value: (schema.styles || {})[id], _tab: tab};
+		}
+		
+		var list = (tab === 'zones') ? schema.zones :
+			(tab === 'components') ? schema.components :
+			schema.componentCategories;
+		
+		if (list != null)
+		{
+			for (var i = 0; i < list.length; i++)
+			{
+				if (list[i] != null && list[i].id === id)
+				{
+					var clone = JSON.parse(JSON.stringify(list[i]));
+					clone._tab = tab;
+					return clone;
+				}
+			}
+		}
+		
+		return {_tab: tab};
+	}
+	
+	function buildRow(tab, values, id)
+	{
+		var tr = document.createElement('tr');
+		
+		for (var i = 0; i < values.length; i++)
+		{
+			var opts = (i === 0) ? {mono: true} : null;
+			
+			if (tab === 'styles' && i === 1)
+			{
+				opts = {mono: true, wrap: true, maxWidth: 500, title: true};
+			}
+			
+			tr.appendChild(makeCell(values[i], opts));
+		}
+		
+		tr.appendChild(makeActionsCell(tab, id));
+		
+		return tr;
+	}
+	
+	function renderZones(filter)
+	{
+		var rows = schema.zones || [];
+		var table = document.createElement('table');
+		table.style.width = '100%';
+		table.style.borderCollapse = 'collapse';
+		
+		var thead = document.createElement('thead');
+		var thr = document.createElement('tr');
+		var headers = ['id', 'name', 'styleRef', 'tags', 'editable', 'source', 'actions'];
+		
+		for (var h = 0; h < headers.length; h++)
+		{
+			thr.appendChild(makeHeader(headers[h]));
+		}
+		
+		thead.appendChild(thr);
+		table.appendChild(thead);
+		
+		var tbody = document.createElement('tbody');
+		var shown = 0;
+		
+		for (var i = 0; i < rows.length; i++)
+		{
+			var r = rows[i] || {};
+			var tagsStr = (r.tags != null) ? r.tags.join(', ') : '';
+			var values = [r.id, r.name, r.styleRef, tagsStr, r.editable === false ? 'false' : 'true', sourceLabel('zones', r.id)];
+			
+			if (!matchesFilter(values, filter))
+			{
+				continue;
+			}
+			
+			tbody.appendChild(buildRow('zones', values, r.id));
+			shown++;
+		}
+		
+		table.appendChild(tbody);
+		tableWrap.innerHTML = '';
+		tableWrap.appendChild(table);
+		countLabel.innerText = shown + ' of ' + rows.length + ' zones';
+	}
+	
+	function renderComponents(filter)
+	{
+		var rows = schema.components || [];
+		var table = document.createElement('table');
+		table.style.width = '100%';
+		table.style.borderCollapse = 'collapse';
+		
+		var thead = document.createElement('thead');
+		var thr = document.createElement('tr');
+		var headers = ['id', 'label', 'category', 'shapeRef', 'source', 'actions'];
+		
+		for (var h = 0; h < headers.length; h++)
+		{
+			thr.appendChild(makeHeader(headers[h]));
+		}
+		
+		thead.appendChild(thr);
+		table.appendChild(thead);
+		
+		var tbody = document.createElement('tbody');
+		var shown = 0;
+		
+		for (var i = 0; i < rows.length; i++)
+		{
+			var r = rows[i] || {};
+			var values = [r.id, r.label, r.category, r.shapeRef, sourceLabel('components', r.id)];
+			
+			if (!matchesFilter(values, filter))
+			{
+				continue;
+			}
+			
+			tbody.appendChild(buildRow('components', values, r.id));
+			shown++;
+		}
+		
+		table.appendChild(tbody);
+		tableWrap.innerHTML = '';
+		tableWrap.appendChild(table);
+		countLabel.innerText = shown + ' of ' + rows.length + ' components';
+	}
+	
+	function renderCategories(filter)
+	{
+		var rows = schema.componentCategories || [];
+		var table = document.createElement('table');
+		table.style.width = '100%';
+		table.style.borderCollapse = 'collapse';
+		
+		var thead = document.createElement('thead');
+		var thr = document.createElement('tr');
+		var headers = ['id', 'name', 'styleRef', 'source', 'actions'];
+		
+		for (var h = 0; h < headers.length; h++)
+		{
+			thr.appendChild(makeHeader(headers[h]));
+		}
+		
+		thead.appendChild(thr);
+		table.appendChild(thead);
+		
+		var tbody = document.createElement('tbody');
+		var shown = 0;
+		
+		for (var i = 0; i < rows.length; i++)
+		{
+			var r = rows[i] || {};
+			var values = [r.id, r.name, r.styleRef, sourceLabel('categories', r.id)];
+			
+			if (!matchesFilter(values, filter))
+			{
+				continue;
+			}
+			
+			tbody.appendChild(buildRow('categories', values, r.id));
+			shown++;
+		}
+		
+		table.appendChild(tbody);
+		tableWrap.innerHTML = '';
+		tableWrap.appendChild(table);
+		countLabel.innerText = shown + ' of ' + rows.length + ' categories';
+	}
+	
+	function renderStyles(filter)
+	{
+		var styles = schema.styles || {};
+		var keys = [];
+		
+		for (var k in styles)
+		{
+			if (styles.hasOwnProperty(k))
+			{
+				keys.push(k);
+			}
+		}
+		
+		keys.sort();
+		
+		var table = document.createElement('table');
+		table.style.width = '100%';
+		table.style.borderCollapse = 'collapse';
+		
+		var thead = document.createElement('thead');
+		var thr = document.createElement('tr');
+		var headers = ['key', 'style', 'source', 'actions'];
+		
+		for (var h = 0; h < headers.length; h++)
+		{
+			thr.appendChild(makeHeader(headers[h]));
+		}
+		
+		thead.appendChild(thr);
+		table.appendChild(thead);
+		
+		var tbody = document.createElement('tbody');
+		var shown = 0;
+		
+		for (var i = 0; i < keys.length; i++)
+		{
+			var key = keys[i];
+			var value = styles[key];
+			var values = [key, value, sourceLabel('styles', key)];
+			
+			if (!matchesFilter(values, filter))
+			{
+				continue;
+			}
+			
+			tbody.appendChild(buildRow('styles', values, key));
+			shown++;
+		}
+		
+		table.appendChild(tbody);
+		tableWrap.innerHTML = '';
+		tableWrap.appendChild(table);
+		countLabel.innerText = shown + ' of ' + keys.length + ' styles';
+	}
+	
+	// ── Firewall Rules working state ─────────────────────────────────────
+	var effectiveFwRules = (schema != null && schema.firewallRules != null) ? schema.firewallRules : {default: {}, rules: []};
+	var workingFwRules = JSON.parse(JSON.stringify(effectiveFwRules));
+	overrides.firewallRules = overrides.firewallRules || null;
+
+	var fwSelectedIndex = -1;
+	var fwSectionValue = 'rules';
+
+	function renderFirewallRules(filter)
+	{
+		tableWrap.innerHTML = '';
+		editorWrap.style.display = 'none';
+		editorWrap.innerHTML = '';
+
+		// Section selector
+		var sectionBar = document.createElement('div');
+		sectionBar.style.marginBottom = '8px';
+		sectionBar.style.display = 'flex';
+		sectionBar.style.gap = '8px';
+		sectionBar.style.alignItems = 'center';
+
+		var secLabel = document.createElement('span');
+		secLabel.style.fontWeight = '600';
+		secLabel.style.fontSize = '12px';
+		mxUtils.write(secLabel, 'Section:');
+		sectionBar.appendChild(secLabel);
+
+		var secSelect = document.createElement('select');
+		secSelect.style.height = '26px';
+		var secOpts = [
+			{value: 'rules', label: 'Rules'},
+			{value: 'default', label: 'Default Policy'}
+		];
+
+		for (var s = 0; s < secOpts.length; s++)
+		{
+			var sOpt = document.createElement('option');
+			sOpt.value = secOpts[s].value;
+			sOpt.text = secOpts[s].label;
+			secSelect.appendChild(sOpt);
+		}
+
+		secSelect.value = fwSectionValue;
+		sectionBar.appendChild(secSelect);
+		tableWrap.appendChild(sectionBar);
+
+		// Default policy editor
+		var defaultSection = document.createElement('div');
+		defaultSection.style.display = fwSectionValue === 'default' ? '' : 'none';
+		defaultSection.style.padding = '8px';
+		defaultSection.style.border = '1px solid rgba(255,255,255,0.12)';
+		defaultSection.style.borderRadius = '4px';
+		defaultSection.style.fontSize = '12px';
+
+		var defaultLabel = document.createElement('div');
+		defaultLabel.style.fontWeight = '600';
+		defaultLabel.style.marginBottom = '8px';
+		mxUtils.write(defaultLabel, 'Default fallback policy (applied when no rule matches):');
+		defaultSection.appendChild(defaultLabel);
+
+		var dflt = workingFwRules.default || {};
+
+		function makeDefaultRow(label, key, opts)
+		{
+			var row = document.createElement('div');
+			row.style.display = 'flex';
+			row.style.alignItems = 'center';
+			row.style.gap = '8px';
+			row.style.marginBottom = '6px';
+
+			var lbl = document.createElement('label');
+			lbl.style.width = '120px';
+			lbl.style.fontWeight = '500';
+			mxUtils.write(lbl, label);
+			row.appendChild(lbl);
+
+			var ctrl;
+
+			if (opts != null)
+			{
+				ctrl = document.createElement('select');
+				ctrl.style.height = '24px';
+				ctrl.style.width = '180px';
+
+				for (var i = 0; i < opts.length; i++)
+				{
+					var o = document.createElement('option');
+					o.value = opts[i];
+					o.text = opts[i];
+					ctrl.appendChild(o);
+				}
+
+				ctrl.value = dflt[key] != null ? dflt[key] : '';
+			}
+			else
+			{
+				ctrl = document.createElement('input');
+				ctrl.type = 'text';
+				ctrl.value = dflt[key] != null ? String(dflt[key]) : '';
+				ctrl.style.height = '24px';
+				ctrl.style.width = '180px';
+				ctrl.style.padding = '0 6px';
+				ctrl.style.boxSizing = 'border-box';
+			}
+
+			ctrl.dataset.key = key;
+			row.appendChild(ctrl);
+
+			return {row: row, ctrl: ctrl};
+		}
+
+		var dfltFtRow = makeDefaultRow('firewallType', 'firewallType', ['physical', 'virtual', 'none']);
+		var dfltProvRow = makeDefaultRow('provider', 'provider', ['NSX', 'PSO', 'AWS', 'none']);
+		var dfltReqRow = makeDefaultRow('required', 'required', ['true', 'false']);
+		dfltReqRow.ctrl.value = (dflt.required === false) ? 'false' : 'true';
+
+		defaultSection.appendChild(dfltFtRow.row);
+		defaultSection.appendChild(dfltProvRow.row);
+		defaultSection.appendChild(dfltReqRow.row);
+
+		var dfltSaveBtn = mxUtils.button('Save Default Policy', function()
+		{
+			// Only override the default policy — preserve any tombstones in fw.rules
+			var fw = overrides.firewallRules || {};
+			fw.default = {
+				firewallType: dfltFtRow.ctrl.value,
+				provider: dfltProvRow.ctrl.value,
+				required: dfltReqRow.ctrl.value !== 'false'
+			};
+			overrides.firewallRules = fw;
+			registry.setOverrides(editorUi, overrides);
+			schema = registry.getEffective();
+			workingFwRules = JSON.parse(JSON.stringify(schema.firewallRules || {default: {}, rules: []}));
+		});
+		dfltSaveBtn.style.marginTop = '6px';
+		dfltSaveBtn.style.padding = '4px 12px';
+		defaultSection.appendChild(dfltSaveBtn);
+		tableWrap.appendChild(defaultSection);
+
+		// Rules list table
+		var rulesSection = document.createElement('div');
+		rulesSection.style.display = fwSectionValue === 'rules' ? '' : 'none';
+
+		var table = document.createElement('table');
+		table.style.width = '100%';
+		table.style.borderCollapse = 'collapse';
+
+		var thead = document.createElement('thead');
+		var thr = document.createElement('tr');
+		var headers = ['id', 'priority', 'when', 'effect', 'enabled', 'actions'];
+
+		for (var h = 0; h < headers.length; h++)
+		{
+			thr.appendChild(makeHeader(headers[h]));
+		}
+
+		thead.appendChild(thr);
+		table.appendChild(thead);
+
+		var tbody = document.createElement('tbody');
+		var rules = workingFwRules.rules || [];
+		var shown = 0;
+
+		for (var i = 0; i < rules.length; i++)
+		{
+			(function(idx)
+			{
+				var rule = rules[idx];
+
+				if (rule == null)
+				{
+					return;
+				}
+
+				var whenStr = JSON.stringify(rule.when || {});
+				var effectStr = rule.effect ? JSON.stringify(rule.effect) : '';
+				var filterValues = [rule.id, String(rule.priority || ''), whenStr, effectStr];
+
+				if (!matchesFilter(filterValues, filter))
+				{
+					return;
+				}
+
+				var tr = document.createElement('tr');
+				tr.appendChild(makeCell(rule.id, {mono: true}));
+				tr.appendChild(makeCell(String(rule.priority != null ? rule.priority : ''), null));
+				tr.appendChild(makeCell(whenStr, {mono: true, maxWidth: 260, title: true, wrap: false}));
+				tr.appendChild(makeCell(rule.effect ? (rule.effect.firewallType || '') + ' / ' + (rule.effect.provider || '') : '', null));
+				tr.appendChild(makeCell(rule.enabled === false ? 'no' : 'yes', null));
+
+				// Actions cell
+				var actionsTd = document.createElement('td');
+				actionsTd.style.padding = '4px 8px';
+				actionsTd.style.borderBottom = '1px solid #efefef';
+				actionsTd.style.whiteSpace = 'nowrap';
+
+				var editBtn = mxUtils.button('Edit', function(capturedIdx)
+				{
+					return function()
+					{
+						fwSelectedIndex = capturedIdx;
+						showFwRuleEditor(capturedIdx);
+					};
+				}(idx));
+				editBtn.style.marginRight = '4px';
+				editBtn.style.padding = '2px 8px';
+				actionsTd.appendChild(editBtn);
+
+				var delBtn = mxUtils.button('Delete', function(capturedId, capturedFilter)
+				{
+					return function()
+					{
+						editorUi.confirm(
+							'Delete firewall rule "' + capturedId + '"?',
+							function()
+							{
+								// Use _delete tombstone so mergeById removes it from base rules too
+								var fw = overrides.firewallRules || {};
+								var ovRules = Array.isArray(fw.rules) ? fw.rules.slice() : [];
+								ovRules = ovRules.filter(function(r) { return r.id !== capturedId; });
+								ovRules.push({id: capturedId, _delete: true});
+								fw.rules = ovRules;
+								overrides.firewallRules = fw;
+								registry.setOverrides(editorUi, overrides);
+								schema = registry.getEffective();
+								workingFwRules = JSON.parse(JSON.stringify(schema.firewallRules || {default: {}, rules: []}));
+								fwSelectedIndex = -1;
+								renderFirewallRules(capturedFilter);
+							}
+						);
+					};
+				}(rules[idx].id, filter));
+				delBtn.style.padding = '2px 8px';
+				actionsTd.appendChild(delBtn);
+
+				tr.appendChild(actionsTd);
+				tbody.appendChild(tr);
+				shown++;
+			})(i);
+		}
+
+		if (shown === 0)
+		{
+			var empty = document.createElement('tr');
+			var emptytd = document.createElement('td');
+			emptytd.colSpan = 6;
+			emptytd.style.padding = '12px 8px';
+			emptytd.style.color = '#888';
+			emptytd.style.textAlign = 'center';
+			mxUtils.write(emptytd, rules.length === 0 ? 'No firewall rules defined.' : 'No rules match the filter.');
+			empty.appendChild(emptytd);
+			tbody.appendChild(empty);
+		}
+
+		table.appendChild(tbody);
+		rulesSection.appendChild(table);
+		tableWrap.appendChild(rulesSection);
+
+		countLabel.innerText = shown + ' of ' + rules.length + ' rules';
+
+		mxEvent.addListener(secSelect, 'change', function()
+		{
+			fwSectionValue = secSelect.value;
+			renderFirewallRules((searchInput.value || '').trim());
+		});
+	}
+
+	function showFwRuleEditor(idx)
+	{
+		var rules = workingFwRules.rules || [];
+		var isNew = (idx == null);
+		var rule = isNew ? {
+			id: 'fw-rule-' + new Date().getTime(),
+			priority: 50,
+			enabled: true,
+			when: {},
+			effect: {required: true, firewallType: 'physical', provider: 'NSX', reason: ''}
+		} : JSON.parse(JSON.stringify(rules[idx]));
+
+		editorWrap.innerHTML = '';
+		editorWrap.style.display = '';
+
+		var hdr = document.createElement('div');
+		hdr.style.fontWeight = '600';
+		hdr.style.marginBottom = '8px';
+		mxUtils.write(hdr, isNew ? 'Add Firewall Rule' : 'Edit: ' + rule.id);
+		editorWrap.appendChild(hdr);
+
+		// JSON editor
+		var jsonLabel = document.createElement('div');
+		jsonLabel.style.fontSize = '11px';
+		jsonLabel.style.marginBottom = '4px';
+		mxUtils.write(jsonLabel, 'Rule JSON (edit directly):');
+		editorWrap.appendChild(jsonLabel);
+
+		var jsonTa = document.createElement('textarea');
+		jsonTa.value = JSON.stringify(rule, null, 2);
+		jsonTa.style.width = '100%';
+		jsonTa.style.height = '200px';
+		jsonTa.style.fontFamily = 'monospace';
+		jsonTa.style.fontSize = '11px';
+		jsonTa.style.resize = 'vertical';
+		jsonTa.style.boxSizing = 'border-box';
+		jsonTa.style.padding = '6px';
+		jsonTa.style.border = '1px solid rgba(255,255,255,0.2)';
+		jsonTa.style.background = 'transparent';
+		jsonTa.style.color = 'inherit';
+		editorWrap.appendChild(jsonTa);
+
+		var btns = document.createElement('div');
+		btns.style.display = 'flex';
+		btns.style.gap = '8px';
+		btns.style.marginTop = '8px';
+		btns.style.justifyContent = 'flex-end';
+
+		var cancelBtn = mxUtils.button('Cancel', function()
+		{
+			editorWrap.style.display = 'none';
+			editorWrap.innerHTML = '';
+		});
+		btns.appendChild(cancelBtn);
+
+		var saveBtn = mxUtils.button('Save Rule', function()
+		{
+			var parsed;
+
+			try
+			{
+				parsed = JSON.parse(jsonTa.value);
+			}
+			catch (e)
+			{
+				editorUi.showError(mxResources.get('error'), 'Invalid JSON: ' + e.message, mxResources.get('ok'));
+				return;
+			}
+
+			if (!parsed.id)
+			{
+				editorUi.showError(mxResources.get('error'), 'Rule must have an id.', mxResources.get('ok'));
+				return;
+			}
+
+			// Only touch the override layer — never copy the effective rules back
+			// as overrides, which would wipe tombstones for deleted base rules.
+			var fw = overrides.firewallRules || {};
+			var ovRules = Array.isArray(fw.rules) ? fw.rules.slice() : [];
+			var oldId = isNew ? null : (workingFwRules.rules && workingFwRules.rules[idx] ? workingFwRules.rules[idx].id : null);
+
+			// Remove any existing override entry for this id (and old id if renamed)
+			ovRules = ovRules.filter(function(r)
+			{
+				return r.id !== parsed.id && (oldId == null || r.id !== oldId);
+			});
+
+			ovRules.push(parsed);
+			fw.rules = ovRules;
+			overrides.firewallRules = fw;
+			registry.setOverrides(editorUi, overrides);
+			schema = registry.getEffective();
+			workingFwRules = JSON.parse(JSON.stringify(schema.firewallRules || {default: {}, rules: []}));
+			fwSelectedIndex = -1;
+			editorWrap.style.display = 'none';
+			editorWrap.innerHTML = '';
+			renderFirewallRules((searchInput.value || '').trim());
+		});
+		saveBtn.style.fontWeight = '600';
+		btns.appendChild(saveBtn);
+		editorWrap.appendChild(btns);
+	}
+
+	function showEditor(entry)
+	{
+		var tab = tabSelect.value;
+		var isNew = (entry == null);
+		entry = entry || {_tab: tab};
+		editorWrap.innerHTML = '';
+		editorWrap.style.display = '';
+		
+		var header = document.createElement('div');
+		header.style.fontWeight = 'bold';
+		header.style.marginBottom = '10px';
+		mxUtils.write(header, (isNew ? 'Add new ' : 'Edit ') + tab.replace(/s$/, ''));
+		editorWrap.appendChild(header);
+		
+		var form = document.createElement('div');
+		form.style.display = 'grid';
+		form.style.gridTemplateColumns = '120px 1fr';
+		form.style.gap = '8px 10px';
+		form.style.alignItems = 'center';
+		editorWrap.appendChild(form);
+		
+		function addRow(label, control)
+		{
+			var lbl = document.createElement('label');
+			lbl.style.fontWeight = '600';
+			mxUtils.write(lbl, label);
+			form.appendChild(lbl);
+			form.appendChild(control);
+		}
+		
+		function makeInput(value, placeholder)
+		{
+			var inp = document.createElement('input');
+			inp.type = 'text';
+			inp.value = value != null ? value : '';
+			inp.style.height = '26px';
+			inp.style.padding = '0 6px';
+			inp.style.boxSizing = 'border-box';
+			inp.style.width = '100%';
+			
+			if (placeholder)
+			{
+				inp.placeholder = placeholder;
+			}
+			
+			return inp;
+		}
+		
+		function makeSelect(options, value, allowEmpty)
+		{
+			var sel = document.createElement('select');
+			sel.style.height = '28px';
+			sel.style.width = '100%';
+			
+			if (allowEmpty)
+			{
+				var emptyOpt = document.createElement('option');
+				emptyOpt.value = '';
+				emptyOpt.text = '(none)';
+				sel.appendChild(emptyOpt);
+			}
+			
+			for (var i = 0; i < options.length; i++)
+			{
+				var o = document.createElement('option');
+				o.value = options[i].value;
+				o.text = options[i].label;
+				sel.appendChild(o);
+			}
+			
+			sel.value = value != null ? value : '';
+			
+			return sel;
+		}
+		
+		var idInput = makeInput(entry.id, 'unique-id (e.g. my-zone)');
+		idInput.disabled = !isNew;
+		addRow('id', idInput);
+		
+		var controls = {idInput: idInput};
+		
+		if (tab === 'zones')
+		{
+			controls.nameInput = makeInput(entry.name, 'Zone display name');
+			addRow('name', controls.nameInput);
+			
+			var styleKeys = getStyleKeys().map(function(k) { return {value: k, label: k}; });
+			controls.styleRefSelect = makeSelect(styleKeys, entry.styleRef, true);
+			addRow('styleRef', controls.styleRefSelect);
+			
+			controls.tagsInput = makeInput((entry.tags || []).join(', '), 'comma-separated tags');
+			addRow('tags', controls.tagsInput);
+			
+			controls.editableCheck = document.createElement('input');
+			controls.editableCheck.type = 'checkbox';
+			controls.editableCheck.checked = (entry.editable !== false);
+			addRow('editable', controls.editableCheck);
+		}
+		else if (tab === 'components')
+		{
+			controls.labelInput = makeInput(entry.label, 'Component label');
+			addRow('label', controls.labelInput);
+			
+			var catOpts = getCategoryList().map(function(c) { return {value: c.id, label: c.id + ' - ' + (c.name || '')}; });
+			controls.categorySelect = makeSelect(catOpts, entry.category, true);
+			addRow('category', controls.categorySelect);
+			
+			var shapeKeys = getStyleKeys().map(function(k) { return {value: k, label: k}; });
+			controls.shapeRefSelect = makeSelect(shapeKeys, entry.shapeRef, true);
+			addRow('shapeRef', controls.shapeRefSelect);
+		}
+		else if (tab === 'categories')
+		{
+			controls.nameInput = makeInput(entry.name, 'Category display name');
+			addRow('name', controls.nameInput);
+			
+			var styleKeys2 = getStyleKeys().map(function(k) { return {value: k, label: k}; });
+			controls.styleRefSelect = makeSelect(styleKeys2, entry.styleRef, true);
+			addRow('styleRef', controls.styleRefSelect);
+		}
+		else if (tab === 'styles')
+		{
+			controls.valueInput = document.createElement('textarea');
+			controls.valueInput.value = entry.value != null ? entry.value : '';
+			controls.valueInput.style.width = '100%';
+			controls.valueInput.style.minHeight = '70px';
+			controls.valueInput.style.fontFamily = 'monospace';
+			controls.valueInput.style.padding = '6px';
+			controls.valueInput.style.boxSizing = 'border-box';
+			controls.valueInput.placeholder = 'mxGraph style string, e.g. shape=cylinder;fillColor=#dae8fc;';
+			addRow('style', controls.valueInput);
+		}
+		
+		var btns = document.createElement('div');
+		btns.style.marginTop = '12px';
+		btns.style.display = 'flex';
+		btns.style.gap = '8px';
+		btns.style.justifyContent = 'flex-end';
+		editorWrap.appendChild(btns);
+		
+		var cancelBtn = mxUtils.button('Cancel', function()
+		{
+			editorWrap.style.display = 'none';
+			editorWrap.innerHTML = '';
+		});
+		btns.appendChild(cancelBtn);
+		
+		var saveBtn = mxUtils.button('Save', function()
+		{
+			var id = (controls.idInput.value || '').trim();
+			
+			if (id.length === 0)
+			{
+				editorUi.showError(mxResources.get('error'), 'id is required', mxResources.get('ok'));
+				return;
+			}
+			
+			if (tab === 'styles')
+			{
+				overrides.styles[id] = controls.valueInput.value || '';
+			}
+			else
+			{
+				var item = {id: id};
+				var list = (tab === 'zones') ? overrides.zones :
+					(tab === 'components') ? overrides.components :
+					overrides.componentCategories;
+				
+				if (tab === 'zones')
+				{
+					if (controls.nameInput.value) item.name = controls.nameInput.value;
+					if (controls.styleRefSelect.value) item.styleRef = controls.styleRefSelect.value;
+					var tagsStr = (controls.tagsInput.value || '').trim();
+					
+					if (tagsStr.length > 0)
+					{
+						item.tags = tagsStr.split(',').map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
+					}
+					
+					item.editable = !!controls.editableCheck.checked;
+				}
+				else if (tab === 'components')
+				{
+					if (controls.labelInput.value) item.label = controls.labelInput.value;
+					if (controls.categorySelect.value) item.category = controls.categorySelect.value;
+					if (controls.shapeRefSelect.value) item.shapeRef = controls.shapeRefSelect.value;
+				}
+				else
+				{
+					if (controls.nameInput.value) item.name = controls.nameInput.value;
+					if (controls.styleRefSelect.value) item.styleRef = controls.styleRefSelect.value;
+				}
+				
+				upsertOverrideItem(list, item);
+			}
+			
+			persist();
+			editorWrap.style.display = 'none';
+			editorWrap.innerHTML = '';
+			renderCurrentTab();
+		});
+		saveBtn.style.fontWeight = '600';
+		btns.appendChild(saveBtn);
+	}
+	
+	function renderCurrentTab()
+	{
+		var filter = (searchInput.value || '').trim();
+		
+		if (tabSelect.value === 'zones')
+		{
+			renderZones(filter);
+		}
+		else if (tabSelect.value === 'components')
+		{
+			renderComponents(filter);
+		}
+		else if (tabSelect.value === 'categories')
+		{
+			renderCategories(filter);
+		}
+		else if (tabSelect.value === 'firewallRules')
+		{
+			renderFirewallRules(filter);
+		}
+		else
+		{
+			renderStyles(filter);
+		}
+	}
+	
+	mxEvent.addListener(tabSelect, 'change', function()
+	{
+		editorWrap.style.display = 'none';
+		editorWrap.innerHTML = '';
+		fwSelectedIndex = -1;
+		fwSectionValue = 'rules';
+		renderCurrentTab();
+	});
+	mxEvent.addListener(searchInput, 'input', renderCurrentTab);
+	renderCurrentTab();
+
+	div.appendChild(makeSaveDiagramBar(editorUi));
+
+	this.container = div;
+	this.init = function() {};
+};
+
+/**
  * Constructs a dialog for creating new files from templates.
  */
 var SplashDialog = function(editorUi)

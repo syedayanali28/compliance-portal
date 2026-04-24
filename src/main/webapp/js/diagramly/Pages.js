@@ -1211,6 +1211,40 @@ EditorUi.prototype.selectPage = function(page, quiet, viewState)
 	}
 };
 
+EditorUi.prototype.refreshArchitectureSchema = function(done)
+{
+	var graph = this.editor.graph;
+	
+	if (window.ArchitectureSchemaRegistry == null)
+	{
+		graph.setArchitectureSchema(null);
+		
+		if (typeof done === 'function')
+		{
+			done(null);
+		}
+		
+		return;
+	}
+	
+	window.ArchitectureSchemaRegistry.load(this, mxUtils.bind(this, function(schema)
+	{
+		graph.setArchitectureSchema(schema);
+		
+		if (typeof done === 'function')
+		{
+			done(schema);
+		}
+	}));
+};
+
+var editorUiSelectPage = EditorUi.prototype.selectPage;
+EditorUi.prototype.selectPage = function(page, quiet, viewState)
+{
+	editorUiSelectPage.apply(this, arguments);
+	this.refreshArchitectureSchema();
+};
+
 /**
  * 
  */

@@ -68,6 +68,24 @@ if (window.location.hash != null && window.location.hash.substring(0, 2) == '#P'
     }
 }
 
+// Local loopback: use unminified sources (Devel.js + diagramsly/*.js) so HKMA fork
+// changes (e.g. File menu architecture exports) load without rebuilding app.min.js.
+// Override with explicit dev=0 in the URL if you need the minified bundle on localhost.
+try
+{
+    var loopbackHost = window.location.hostname || '';
+
+    if (urlParams['dev'] != '1' && urlParams['dev'] != '0' &&
+        (loopbackHost === 'localhost' || loopbackHost === '127.0.0.1' || loopbackHost === '[::1]'))
+    {
+        urlParams['dev'] = '1';
+    }
+}
+catch (e)
+{
+    // ignore
+}
+
 // Global variable for desktop
 var mxIsElectron = navigator.userAgent != null && navigator.userAgent.toLowerCase().indexOf(' electron/') > -1 && 
                     navigator.userAgent.indexOf(' draw.io/') > -1;

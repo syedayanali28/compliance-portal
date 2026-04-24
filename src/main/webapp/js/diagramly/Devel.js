@@ -139,6 +139,7 @@ mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-Basic.js');
 mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-Bootstrap.js');
 mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-BPMN.js');
 mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-C4.js');
+mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-Architecture.js');
 mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-Cabinet.js');
 mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-Cisco.js');
 mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-Cisco19.js');
@@ -245,6 +246,11 @@ mxscript(drawDevUrl + 'js/diagramly/mxRuler.js');
 mxscript(drawDevUrl + 'js/diagramly/mxFreehand.js');
 mxscript(drawDevUrl + 'js/diagramly/P2PCollab.js');
 mxscript(drawDevUrl + 'js/diagramly/DevTools.js');
+mxscript(drawDevUrl + 'js/diagramly/architecture/SchemaRegistry.js');
+mxscript(drawDevUrl + 'js/diagramly/architecture/ValidationEngine.js');
+mxscript(drawDevUrl + 'js/diagramly/architecture/ValidationSelfTest.js');
+mxscript(drawDevUrl + 'js/diagramly/architecture/FirewallExtractor.js');
+mxscript(drawDevUrl + 'js/diagramly/architecture/ProjectStore.js');
 
 if (!window.DRAWIO_PUBLIC_BUILD)
 {
