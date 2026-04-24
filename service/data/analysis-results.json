@@ -1,0 +1,113 @@
+[
+  {
+    "analysedAt": "2026-04-24T09:48:54.942Z",
+    "jiraKey": "FWREQ-101",
+    "projectId": null,
+    "projectCode": null,
+    "projectName": null,
+    "llmStub": true,
+    "outcome": "likely_approved",
+    "requiresClarification": false,
+    "analysis": "[STUB] JIRA issue FWREQ-101 corresponds to a flow that aligns with schema firewall rule(s): . This request is likely to be approved subject to standard review.",
+    "evidenceRuleIds": [],
+    "reviewers": [
+      {
+        "name": "Raymond So",
+        "team": "ITS",
+        "role": "Security Reviewer"
+      },
+      {
+        "name": "Ryan Chan",
+        "team": "BSA",
+        "role": "Architecture Reviewer"
+      }
+    ],
+    "jiraIssue": {
+      "key": "FWREQ-101",
+      "summary": "Firewall request: Kong API Gateway → AI Portal BFF",
+      "status": "Open",
+      "assignee": "Alice Wong",
+      "sourceComponent": "integration-kong-api-gateway",
+      "destComponent": "backend-ai-portal-bff",
+      "protocol": "HTTPS",
+      "port": "8443"
+    },
+    "matchedFirewallRow": null,
+    "jiraCommentPosted": false,
+    "jiraCommentId": null
+  },
+  {
+    "analysedAt": "2026-04-24T09:48:54.942Z",
+    "jiraKey": "FWREQ-102",
+    "projectId": null,
+    "projectCode": null,
+    "projectName": null,
+    "llmStub": true,
+    "outcome": "likely_approved",
+    "requiresClarification": false,
+    "analysis": "[STUB] JIRA issue FWREQ-102 corresponds to a flow that aligns with schema firewall rule(s): . This request is likely to be approved subject to standard review.",
+    "evidenceRuleIds": [],
+    "reviewers": [
+      {
+        "name": "Raymond So",
+        "team": "ITS",
+        "role": "Security Reviewer"
+      },
+      {
+        "name": "Ryan Chan",
+        "team": "BSA",
+        "role": "Architecture Reviewer"
+      }
+    ],
+    "jiraIssue": {
+      "key": "FWREQ-102",
+      "summary": "Firewall request: Batch Processor → Core Banking DB",
+      "status": "In Review",
+      "assignee": "Carol Chan",
+      "sourceComponent": "data-batch-processor",
+      "destComponent": "corebanking-oracle-db",
+      "protocol": "TCP",
+      "port": "1521"
+    },
+    "matchedFirewallRow": null,
+    "jiraCommentPosted": false,
+    "jiraCommentId": null
+  },
+  {
+    "analysedAt": "2026-04-24T09:48:54.942Z",
+    "jiraKey": "FWREQ-103",
+    "projectId": null,
+    "projectCode": null,
+    "projectName": null,
+    "llmStub": true,
+    "outcome": "likely_approved",
+    "requiresClarification": false,
+    "analysis": "[STUB] JIRA issue FWREQ-103 corresponds to a flow that aligns with schema firewall rule(s): . This request is likely to be approved subject to standard review.",
+    "evidenceRuleIds": [],
+    "reviewers": [
+      {
+        "name": "Raymond So",
+        "team": "ITS",
+        "role": "Security Reviewer"
+      },
+      {
+        "name": "Ryan Chan",
+        "team": "BSA",
+        "role": "Architecture Reviewer"
+      }
+    ],
+    "jiraIssue": {
+      "key": "FWREQ-103",
+      "summary": "Firewall request: External Web Portal → Internal Auth Service",
+      "status": "Open",
+      "assignee": "Eric Hui",
+      "sourceComponent": "web-portal-frontend",
+      "destComponent": "idmz-auth-service",
+      "protocol": "LDAPS",
+      "port": "636"
+    },
+    "matchedFirewallRow": null,
+    "jiraCommentPosted": false,
+    "jiraCommentId": null
+  }
+]

@@ -242,6 +242,57 @@
     }
     .spacer { flex: 1; }
 
+    /* ── Analysis Panel ── */
+    .card-analysis {
+      margin-top: 6px;
+      border-top: 1px solid rgba(255,255,255,0.06);
+      padding-top: 8px;
+    }
+    .card-analysis-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .card-analysis-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: #777;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .analysis-offline  { font-size: 11px; color: #666; font-style: italic; }
+    .analysis-empty    { font-size: 11px; color: #666; }
+    .analysis-loading  { font-size: 11px; color: #666; font-style: italic; }
+    .analysis-item {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 6px;
+      padding: 8px 10px;
+      margin-bottom: 6px;
+      font-size: 12px;
+    }
+    .analysis-item:last-child { margin-bottom: 0; }
+    .analysis-item-header {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-bottom: 3px;
+      min-width: 0;
+    }
+    .analysis-key     { font-family: monospace; font-weight: 600; color: #4a9eff; flex-shrink: 0; }
+    .analysis-summary { flex: 1; color: #bbb; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .outcome-badge    { font-size: 10px; font-weight: 600; border-radius: 4px; padding: 2px 7px; flex-shrink: 0; }
+    .outcome-likely_approved        { background: #1a3d1a; color: #4caf50; border: 1px solid #4caf5044; }
+    .outcome-requires_clarification { background: #3d2e0a; color: #ffb74d; border: 1px solid #ffb74d44; }
+    .outcome-pending_review         { background: #2a3a50; color: #4a9eff; border: 1px solid #4a9eff44; }
+    .analysis-date { font-size: 10px; color: #666; }
+    .analysis-text {
+      font-size: 11px; color: #999; line-height: 1.4;
+      display: -webkit-box; -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical; overflow: hidden;
+    }
+
     /* ── Empty state ── */
     .empty-state {
       grid-column: 1 / -1;
@@ -375,7 +426,11 @@
     <span>HKMA Projects Portal</span>
     <span class="badge">BTG Admin</span>
   </div>
-  <button class="btn btn-primary" id="newProjectBtn">+ New Project</button>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <button class="btn btn-secondary" id="exportSnapshotBtn" title="Download hkma.projects as JSON and push to the analysis service">&#128229; Export Snapshot</button>
+    <button class="btn btn-secondary" id="runAnalysisBtn" title="Trigger the JIRA firewall poller on the analysis service">&#9654; Run Analysis</button>
+    <button class="btn btn-primary" id="newProjectBtn">+ New Project</button>
+  </div>
 </div>
 
 <!-- Toolbar -->
@@ -673,7 +728,15 @@
           '</div>' +
         '</div>';
 
-      card.innerHTML = headerHtml + metaHtml + descHtml + membersHtml + linkedHtml + actionsHtml;
+      var analysisHtml =
+        '<div class="card-analysis" id="analysis-' + p.id + '">' +
+          '<div class="card-analysis-header">' +
+            '<span class="card-analysis-title">&#128202; Analysis</span>' +
+          '</div>' +
+          '<div class="analysis-loading">Loading&hellip;</div>' +
+        '</div>';
+
+      card.innerHTML = headerHtml + metaHtml + descHtml + membersHtml + linkedHtml + actionsHtml + analysisHtml;
       grid.appendChild(card);
     });
   }
@@ -838,6 +901,152 @@
   }
 
 
+  // ── Analysis service integration ───────────────────────
+  var SERVICE_URL = 'http://localhost:3001';
+
+  function outcomeLabel(outcome) {
+    if (outcome === 'likely_approved')        return '&#10003; Approved';
+    if (outcome === 'requires_clarification') return '&#9888; Clarification';
+    if (outcome === 'pending_review')         return '&#8635; Pending';
+    return outcome || '?';
+  }
+
+  function renderAnalysisPanel(projectId, results) {
+    var panel = document.getElementById('analysis-' + projectId);
+    if (!panel) return;
+
+    var header =
+      '<div class="card-analysis-header">' +
+        '<span class="card-analysis-title">&#128202; Analysis</span>' +
+      '</div>';
+
+    if (!results || results.length === 0) {
+      panel.innerHTML = header + '<div class="analysis-empty">No analysis results yet. Run Analysis to fetch.</div>';
+      return;
+    }
+
+    var items = results.slice(0, 3).map(function(r) {
+      var oc = r.outcome || 'pending_review';
+      return (
+        '<div class="analysis-item">' +
+          '<div class="analysis-item-header">' +
+            '<span class="analysis-key">' + esc(r.jiraKey) + '</span>' +
+            '<span class="analysis-summary">' + esc((r.jiraIssue && r.jiraIssue.summary) || '') + '</span>' +
+            '<span class="outcome-badge outcome-' + oc + '">' + outcomeLabel(oc) + '</span>' +
+          '</div>' +
+          (r.analysis ? '<div class="analysis-text">' + esc(r.analysis) + '</div>' : '') +
+          '<div class="analysis-date">Analysed: ' + fmtDate(r.analysedAt) + (r.llmStub ? ' &nbsp;<em style="color:#555">(stub)</em>' : '') + '</div>' +
+        '</div>'
+      );
+    }).join('');
+
+    var more = results.length > 3
+      ? '<div class="analysis-date" style="margin-top:4px;color:#555;">+ ' + (results.length - 3) + ' more result(s)</div>'
+      : '';
+
+    panel.innerHTML = header + items + more;
+  }
+
+  function renderAnalysisOffline(projectId) {
+    var panel = document.getElementById('analysis-' + projectId);
+    if (!panel) return;
+    panel.innerHTML =
+      '<div class="card-analysis-header"><span class="card-analysis-title">&#128202; Analysis</span></div>' +
+      '<div class="analysis-offline">Analysis service offline &mdash; start <code>service/</code> to enable.</div>';
+  }
+
+  function loadAnalysisForProject(p) {
+    if (!p || !p.id) return;
+    fetch(SERVICE_URL + '/api/analysis/' + encodeURIComponent(p.id))
+      .then(function(res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function(results) {
+        renderAnalysisPanel(p.id, results);
+      })
+      .catch(function() {
+        renderAnalysisOffline(p.id);
+      });
+  }
+
+  function loadAllAnalysis(projects) {
+    (projects || store.getAll()).forEach(function(p) {
+      loadAnalysisForProject(p);
+    });
+  }
+
+  // ── Export Snapshot button ─────────────────────────────
+  function exportProjectsSnapshot() {
+    var projects = store.getAll();
+    // Strip bulky diagram XML from the snapshot to keep the file small.
+    // The service only needs identity/firewall data for correlation.
+    var snapshot = projects.map(function(p) {
+      return {
+        id:              p.id,
+        name:            p.name,
+        code:            p.code,
+        team:            p.team,
+        status:          p.status,
+        members:         p.members,
+        description:     p.description,
+        firewallJson:    p.firewallJson  || null,
+        firewallFilename: p.firewallFilename || null,
+        diagramFilename: p.diagramFilename || null,
+        linkedAt:        p.linkedAt       || null,
+        firewallLinkedAt: p.firewallLinkedAt || null,
+        createdAt:       p.createdAt      || null,
+      };
+    });
+
+    // Always download locally
+    downloadJson(snapshot, 'projects-snapshot.json');
+
+    // Best-effort push to the service (silently ignored if offline)
+    fetch(SERVICE_URL + '/api/projects/sync', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(snapshot),
+    })
+    .then(function(res) {
+      if (res.ok) {
+        showToast('Snapshot exported and pushed to analysis service (' + snapshot.length + ' projects).', 'success');
+      } else {
+        showToast('Snapshot downloaded. Service returned HTTP ' + res.status + '.', 'info');
+      }
+    })
+    .catch(function() {
+      showToast('Snapshot downloaded. Service is offline — drop the file into service/data/ manually.', 'info');
+    });
+  }
+
+  // ── Run Analysis button ─────────────────────────────────
+  function triggerRunAnalysis() {
+    var btn = document.getElementById('runAnalysisBtn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Running\u2026'; }
+
+    fetch(SERVICE_URL + '/api/run', { method: 'POST' })
+      .then(function(res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function() {
+        showToast('Analysis triggered! Results will appear on cards in a few seconds.', 'info');
+        // Reload analysis panels after a short delay to give the poller time to finish
+        setTimeout(function() {
+          loadAllAnalysis();
+          if (btn) { btn.disabled = false; btn.innerHTML = '&#9654; Run Analysis'; }
+        }, 4000);
+      })
+      .catch(function() {
+        showToast('Analysis service is offline. Start service/ and try again.', 'error');
+        if (btn) { btn.disabled = false; btn.innerHTML = '&#9654; Run Analysis'; }
+      });
+  }
+
+  document.getElementById('exportSnapshotBtn').addEventListener('click', exportProjectsSnapshot);
+  document.getElementById('runAnalysisBtn').addEventListener('click', triggerRunAnalysis);
+
   // ── Modal helpers ──────────────────────────────────────
   function openModal(title) {
     document.getElementById('modalTitle').textContent = title;
@@ -936,6 +1145,14 @@
 
   // ── Initial render ─────────────────────────────────────
   render();
+  loadAllAnalysis();
+
+  // Reload analysis panels after filter changes so new cards get populated
+  var _origRender = render;
+  render = function() {
+    _origRender();
+    loadAllAnalysis();
+  };
 
 })();
 </script>

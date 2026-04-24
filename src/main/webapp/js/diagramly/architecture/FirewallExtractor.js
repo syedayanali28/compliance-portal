@@ -547,9 +547,158 @@
 		};
 	}
 
+	// ── Phase 3: Firewall Analysis JSON (LLM stub) ───────────────────────
+	//
+	// Takes the output of extract() and augments every row with stub
+	// analysis fields that mirror the shape the LLM integration will
+	// eventually populate.  Each row gets:
+	//
+	//   analysis            – human-readable stub reasoning string
+	//   outcome             – "likely_approved" | "requires_clarification" | "pending_review"
+	//   requiresClarification – boolean
+	//   evidenceRuleIds     – schema rule IDs cited as evidence
+	//   reviewers           – fixed reviewer list (ITS + BSA)
+	//   llmStub             – true  (signals this is a stub, not a real LLM result)
+	//
+	// Rules for stub outcome:
+	//   • validation.allowed === false  → requires_clarification  (edge rule violated)
+	//   • appliedRuleIds contains "__default__"  → pending_review  (no specific rule matched;
+	//       LLM needs more context to decide)
+	//   • specific rule matched AND validation passed → likely_approved
+
+	var REVIEWERS = [
+		{ name: 'Raymond So',  team: 'ITS', role: 'Security Reviewer' },
+		{ name: 'Ryan Chan',   team: 'BSA', role: 'Architecture Reviewer' }
+	];
+
+	function buildAnalysisStubForRow(row)
+	{
+		var validationAllowed = row.validation ? row.validation.allowed : true;
+		var violationRuleIds  = (row.validation && row.validation.violationRuleIds) || [];
+		var appliedRuleIds    = row.appliedRuleIds || [];
+		var usedDefault       = appliedRuleIds.indexOf('__default__') !== -1;
+
+		var outcome;
+		var requiresClarification;
+		var evidenceRuleIds;
+		var analysis;
+
+		if (!validationAllowed)
+		{
+			outcome = 'requires_clarification';
+			requiresClarification = true;
+			evidenceRuleIds = violationRuleIds.slice();
+			analysis =
+				'Edge validation failed. The connection from "' +
+				(row.sourceComponentLabel || row.sourceComponentId) + '" (' + (row.sourceCategory || 'unknown') +
+				') to "' +
+				(row.destComponentLabel || row.destComponentId) + '" (' + (row.destCategory || 'unknown') +
+				') violates schema rule(s): [' + violationRuleIds.join(', ') + ']. ' +
+				'This firewall request requires clarification from the project team before approval. ' +
+				'[STUB — awaiting LLM analysis]';
+		}
+		else if (usedDefault)
+		{
+			outcome = 'pending_review';
+			requiresClarification = false;
+			evidenceRuleIds = [];
+			analysis =
+				'No specific firewall classification rule matched for the connection from "' +
+				(row.sourceComponentLabel || row.sourceComponentId) + '" to "' +
+				(row.destComponentLabel || row.destComponentId) + '". ' +
+				'The default policy (' + row.firewallType + ' / ' + row.provider + ') was applied. ' +
+				'Manual review is recommended to confirm this connection is intentional and appropriately classified. ' +
+				'[STUB — awaiting LLM analysis]';
+		}
+		else
+		{
+			outcome = 'likely_approved';
+			requiresClarification = false;
+			evidenceRuleIds = appliedRuleIds.slice();
+			analysis =
+				'The connection from "' +
+				(row.sourceComponentLabel || row.sourceComponentId) + '" (' + (row.sourceCategory || 'unknown') +
+				') to "' +
+				(row.destComponentLabel || row.destComponentId) + '" (' + (row.destCategory || 'unknown') +
+				') is consistent with schema rule(s): [' + appliedRuleIds.join(', ') + ']. ' +
+				'Firewall type: ' + row.firewallType + ', provider: ' + row.provider + '. ' +
+				'This request appears to be architecturally aligned with the design. ' +
+				'[STUB — awaiting LLM analysis]';
+		}
+
+		return {
+			analysis:             analysis,
+			outcome:              outcome,
+			requiresClarification: requiresClarification,
+			evidenceRuleIds:      evidenceRuleIds,
+			reviewers:            REVIEWERS,
+			llmStub:              true
+		};
+	}
+
+	function buildFirewallAnalysisJson(graph, schema, diagramTitle)
+	{
+		var extracted = extract(graph, schema, diagramTitle);
+
+		var analysisRows = [];
+
+		for (var i = 0; i < extracted.rows.length; i++)
+		{
+			var row  = extracted.rows[i];
+			var stub = buildAnalysisStubForRow(row);
+
+			// Merge the original row fields with the analysis stub
+			var analysisRow = {};
+			var key;
+
+			for (key in row)
+			{
+				if (row.hasOwnProperty(key)) { analysisRow[key] = row[key]; }
+			}
+
+			for (key in stub)
+			{
+				if (stub.hasOwnProperty(key)) { analysisRow[key] = stub[key]; }
+			}
+
+			analysisRows.push(analysisRow);
+		}
+
+		var requiresClarificationCount = 0;
+		var likelyApprovedCount        = 0;
+		var pendingReviewCount          = 0;
+
+		for (var j = 0; j < analysisRows.length; j++)
+		{
+			var r = analysisRows[j];
+
+			if (r.outcome === 'requires_clarification') { requiresClarificationCount++; }
+			else if (r.outcome === 'likely_approved')   { likelyApprovedCount++; }
+			else                                        { pendingReviewCount++; }
+		}
+
+		return {
+			generatedAt:   extracted.generatedAt,
+			schemaVersion: extracted.schemaVersion,
+			diagramTitle:  extracted.diagramTitle,
+			analysisType:  'firewall-analysis-stub',
+			llmStub:       true,
+			summary: {
+				totalRequests:          analysisRows.length,
+				likelyApproved:         likelyApprovedCount,
+				pendingReview:          pendingReviewCount,
+				requiresClarification:  requiresClarificationCount
+			},
+			reviewers:         REVIEWERS,
+			schemaValidation:  extracted.schemaValidation,
+			rows:              analysisRows
+		};
+	}
+
 	window.ArchitectureFirewallExtractor =
 	{
-		extract:          extract,
-		buildDiagramJson: buildDiagramJson
+		extract:                  extract,
+		buildDiagramJson:         buildDiagramJson,
+		buildFirewallAnalysisJson: buildFirewallAnalysisJson
 	};
 })();

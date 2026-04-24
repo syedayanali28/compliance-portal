@@ -1,0 +1,62 @@
+[
+  {
+    "key": "FWREQ-101",
+    "fields": {
+      "summary": "Firewall request: Kong API Gateway → AI Portal BFF",
+      "description": "The Kong API Gateway in the integration zone needs to reach the AI Portal Backend-for-Frontend service on port 8443 (HTTPS) to forward authenticated API calls from external consumers.\n\nSource: integration-kong-api-gateway\nDestination: backend-ai-portal-bff\nProtocol: HTTPS\nPort: 8443\nJustification: Required for Phase 2 CSP API rollout.",
+      "status": { "name": "Open" },
+      "priority": { "name": "High" },
+      "assignee": { "displayName": "Alice Wong" },
+      "reporter": { "displayName": "Bob Lam" },
+      "project": { "key": "CSP", "name": "CSP Phase 2" },
+      "created": "2026-04-10T09:15:00.000+0800",
+      "updated": "2026-04-15T14:30:00.000+0800",
+      "customfield_sourceComponent": "integration-kong-api-gateway",
+      "customfield_destComponent": "backend-ai-portal-bff",
+      "customfield_protocol": "HTTPS",
+      "customfield_port": "8443",
+      "customfield_sourceZone": "integration-zone",
+      "customfield_destZone": "oa-private-cloud"
+    }
+  },
+  {
+    "key": "FWREQ-102",
+    "fields": {
+      "summary": "Firewall request: Batch Processor → Core Banking DB",
+      "description": "Nightly batch reconciliation process running in the data platform zone must connect to the Core Banking Oracle DB on port 1521.\n\nSource: data-batch-processor\nDestination: corebanking-oracle-db\nProtocol: TCP (Oracle Net)\nPort: 1521\nJustification: End-of-day batch settlement required for GL reconciliation.",
+      "status": { "name": "In Review" },
+      "priority": { "name": "Critical" },
+      "assignee": { "displayName": "Carol Chan" },
+      "reporter": { "displayName": "David Ng" },
+      "project": { "key": "COREBANK", "name": "Core Banking Modernisation" },
+      "created": "2026-04-12T11:00:00.000+0800",
+      "updated": "2026-04-20T09:00:00.000+0800",
+      "customfield_sourceComponent": "data-batch-processor",
+      "customfield_destComponent": "corebanking-oracle-db",
+      "customfield_protocol": "TCP",
+      "customfield_port": "1521",
+      "customfield_sourceZone": "data-platform",
+      "customfield_destZone": "oa-baremetal"
+    }
+  },
+  {
+    "key": "FWREQ-103",
+    "fields": {
+      "summary": "Firewall request: External Web Portal → Internal Auth Service",
+      "description": "The public-facing web portal in the DMZ requires outbound access to the internal LDAP/AD authentication service in the IDMZ on port 636 (LDAPS).\n\nSource: web-portal-frontend\nDestination: idmz-auth-service\nProtocol: LDAPS\nPort: 636\nJustification: User authentication flow for HKMA staff portal login.",
+      "status": { "name": "Open" },
+      "priority": { "name": "Medium" },
+      "assignee": { "displayName": "Eric Hui" },
+      "reporter": { "displayName": "Fiona Leung" },
+      "project": { "key": "STAFFPORTAL", "name": "Staff Portal" },
+      "created": "2026-04-18T16:45:00.000+0800",
+      "updated": "2026-04-22T10:15:00.000+0800",
+      "customfield_sourceComponent": "web-portal-frontend",
+      "customfield_destComponent": "idmz-auth-service",
+      "customfield_protocol": "LDAPS",
+      "customfield_port": "636",
+      "customfield_sourceZone": "dmz",
+      "customfield_destZone": "idmz"
+    }
+  }
+]

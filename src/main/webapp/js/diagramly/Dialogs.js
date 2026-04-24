@@ -301,49 +301,7 @@ var StorageDialog = function(editorUi, fn, rowLimit)
 function makeSaveDiagramBar(editorUi)
 {
 	var bar = document.createElement('div');
-	bar.style.flexShrink = '0';
-	bar.style.marginTop = '8px';
-	bar.style.paddingTop = '8px';
-	bar.style.borderTop = '1px solid rgba(255,255,255,0.12)';
-	bar.style.display = 'flex';
-	bar.style.alignItems = 'center';
-	bar.style.gap = '10px';
 
-	var info = document.createElement('span');
-	info.style.fontSize = '11px';
-	info.style.color = '#888';
-	info.style.flex = '1';
-	info.innerHTML = '&#128190; Changes are stored in the <b>.drawio file</b>. ' +
-		'They will be lost on refresh unless the diagram is saved.';
-	bar.appendChild(info);
-
-	var saveBtn = mxUtils.button('Save Diagram', function()
-	{
-		try
-		{
-			var saveAction = editorUi.actions.get('save');
-
-			if (saveAction != null)
-			{
-				saveAction.funct();
-			}
-			else
-			{
-				editorUi.saveFile(false);
-			}
-		}
-		catch (e)
-		{
-			editorUi.showError('Error', 'Could not save: ' + e.message, 'OK');
-		}
-	});
-	saveBtn.className = 'geBtn';
-	saveBtn.style.fontWeight = '600';
-	saveBtn.style.background = '#4a9eff';
-	saveBtn.style.color = '#fff';
-	saveBtn.style.border = 'none';
-	saveBtn.style.flexShrink = '0';
-	bar.appendChild(saveBtn);
 
 	return bar;
 }
@@ -358,67 +316,47 @@ var ValidationRulesDialog = function(editorUi)
 	div.style.flexDirection = 'column';
 
 	var graph = editorUi.editor.graph;
-	var reg = window.ArchitectureSchemaRegistry;
+	var reg   = window.ArchitectureSchemaRegistry;
 
-	// overrides: the raw per-diagram override object stored on the page node.
-	// This is the single source of truth we read from and write to.
-	// We never mix effective (merged) rule objects back into overrides, which
-	// was the root cause of deleted rules reappearing after Save Rules.
-	var overrides = (reg != null) ? (reg.getOverrides(editorUi) || {}) : {};
-	console.log('[ValidationRulesDialog] opened. overrides at open time:', JSON.stringify(overrides, null, 2));
+	// ── Persistence state ────────────────────────────────────────────────────
+	// overrides is the single source of truth — we never replace it with the
+	// effective (merged) schema, which was the old tombstone-erasure bug.
+	var overrides   = (reg != null) ? (reg.getOverrides(editorUi) || {}) : {};
+	var baseSchema  = (reg != null) ? reg.getBase() : null;
+	var baseRules   = (baseSchema && baseSchema.rules) ? baseSchema.rules : {edgeRules: [], containmentRules: []};
 
-	var baseSchema = (reg != null) ? reg.getBase() : null;
-	var baseRules = (baseSchema != null && baseSchema.rules != null) ?
-		baseSchema.rules : {edgeRules: [], containmentRules: []};
+	// Category + zone lists for chip groups
+	var effSchema     = (reg != null) ? reg.getEffective() : null;
+	var allCategories = (effSchema && effSchema.componentCategories) ? effSchema.componentCategories
+	                  : (baseSchema && baseSchema.componentCategories) ? baseSchema.componentCategories : [];
+	var allZones      = (effSchema && effSchema.zones) ? effSchema.zones
+	                  : (baseSchema && baseSchema.zones) ? baseSchema.zones : [];
 
-	// Build a set of ids that exist in the base schema for a given section.
-	// Used to decide whether to emit a tombstone on delete.
 	function buildBaseIdSet(section)
 	{
-		var arr = (baseRules[section] || []);
+		var arr = baseRules[section] || [];
 		var set = {};
 		for (var i = 0; i < arr.length; i++) { if (arr[i] && arr[i].id) set[arr[i].id] = true; }
 		return set;
 	}
 
-	// Return the current effective (display) rules for the selected section.
-	// We always derive this fresh from the registry so it reflects the
-	// latest merged state (base + overrides), not a stale workingRules copy.
 	function effectiveSection()
 	{
-		var eff = (reg != null) ? reg.getEffective() : null;
-		var rules = (eff != null && eff.rules != null) ? eff.rules : {edgeRules: [], containmentRules: []};
+		var eff   = (reg != null) ? reg.getEffective() : null;
+		var rules = (eff && eff.rules) ? eff.rules : {edgeRules: [], containmentRules: []};
 		return rules[sectionSelect.value] || [];
 	}
 
-	// Commit overrides to the registry and refresh the graph schema.
-	// This is the only place that touches setOverrides — keeping overrides
-	// as the canonical store and never copying effective rules back into it.
 	function commitOverrides()
 	{
-		console.group('[ValidationRulesDialog] commitOverrides');
-		console.log('  overrides being committed:', JSON.stringify(overrides, null, 2));
-
 		if (reg != null)
 		{
 			reg.setOverrides(editorUi, overrides);
 			var newEff = reg.getEffective();
-			console.log('  effective edgeRules after commit:', JSON.stringify(newEff && newEff.rules && newEff.rules.edgeRules));
-
-			if (graph.setArchitectureSchema != null)
-			{
-				graph.setArchitectureSchema(newEff);
-			}
+			if (graph.setArchitectureSchema != null) { graph.setArchitectureSchema(newEff); }
 		}
-		else
-		{
-			console.error('[ValidationRulesDialog] commitOverrides: ArchitectureSchemaRegistry is NULL');
-		}
-
-		console.groupEnd();
 	}
 
-	// Ensure overrides.rules[section] exists as an array and return it.
 	function getOrCreateOverrideSection(section)
 	{
 		overrides.rules = overrides.rules || {};
@@ -426,7 +364,7 @@ var ValidationRulesDialog = function(editorUi)
 		return overrides.rules[section];
 	}
 
-	// ----- UI -----
+	// ── Generic UI helpers ───────────────────────────────────────────────────
 
 	function createButton(label, fn)
 	{
@@ -435,147 +373,488 @@ var ValidationRulesDialog = function(editorUi)
 		return btn;
 	}
 
+	function makeFieldLabel(text)
+	{
+		var lbl = document.createElement('div');
+		lbl.style.fontSize = '10px';
+		lbl.style.fontWeight = '600';
+		lbl.style.color = '#999';
+		lbl.style.textTransform = 'uppercase';
+		lbl.style.letterSpacing = '0.5px';
+		lbl.style.marginBottom = '3px';
+		lbl.textContent = text;
+		return lbl;
+	}
+
+	function makeTextInput(value, placeholder)
+	{
+		var inp = document.createElement('input');
+		inp.type = 'text';
+		inp.value = value || '';
+		if (placeholder) inp.placeholder = placeholder;
+		inp.style.cssText = 'background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.18);' +
+			'border-radius:4px;color:inherit;padding:5px 8px;font-size:12px;box-sizing:border-box;' +
+			'width:100%;outline:none;font-family:inherit;';
+		return inp;
+	}
+
+	function makeSelect(options, currentValue)
+	{
+		var sel = document.createElement('select');
+		sel.style.cssText = 'background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.18);' +
+			'border-radius:4px;color:inherit;padding:4px 8px;font-size:12px;outline:none;cursor:pointer;';
+		options.forEach(function(o)
+		{
+			var opt = document.createElement('option');
+			opt.value = o.value;
+			opt.textContent = o.label;
+			sel.appendChild(opt);
+		});
+		sel.value = currentValue || '';
+		return sel;
+	}
+
+	// Chip-toggle multi-select.
+	// items: array of {id, name}  |  selected: string[] (mutated in place)
+	function buildChipGroup(items, selected)
+	{
+		var wrap = document.createElement('div');
+		wrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:4px;padding:2px 0;';
+
+		items.forEach(function(item)
+		{
+			var chip = document.createElement('button');
+			chip.type = 'button';
+			chip.textContent = item.name || item.id;
+
+			function applyStyle()
+			{
+				var on = selected.indexOf(item.id) !== -1;
+				chip.style.cssText = 'padding:2px 10px;border-radius:12px;font-size:11px;cursor:pointer;' +
+					'transition:all 0.12s;outline:none;font-family:inherit;' +
+					(on ? 'background:#4a9eff;color:#fff;border:1px solid #4a9eff;'
+					    : 'background:rgba(255,255,255,0.06);color:#aaa;border:1px solid rgba(255,255,255,0.15);');
+			}
+			applyStyle();
+
+			mxEvent.addListener(chip, 'click', function()
+			{
+				var idx = selected.indexOf(item.id);
+				if (idx === -1) { selected.push(item.id); } else { selected.splice(idx, 1); }
+				applyStyle();
+			});
+
+			wrap.appendChild(chip);
+		});
+
+		return wrap;
+	}
+
+	// Collapsible zone-chip section (used for optional From/To Zone filters)
+	function makeCollapsibleChipSection(headerText, selected)
+	{
+		var wrap = document.createElement('div');
+
+		var headerRow = document.createElement('div');
+		headerRow.style.cssText = 'display:flex;align-items:center;gap:5px;cursor:pointer;user-select:none;padding:2px 0;';
+
+		var arrow = document.createElement('span');
+		arrow.style.cssText = 'font-size:10px;color:#666;';
+		arrow.textContent = selected.length > 0 ? '▼' : '▶';
+
+		var lbl = document.createElement('span');
+		lbl.style.cssText = 'font-size:11px;font-weight:600;color:#888;';
+		lbl.textContent = headerText + (selected.length > 0 ? ' (' + selected.length + ' selected)' : ' — optional, click to expand');
+
+		headerRow.appendChild(arrow);
+		headerRow.appendChild(lbl);
+
+		var body = document.createElement('div');
+		body.style.display = selected.length > 0 ? 'block' : 'none';
+		body.style.marginTop = '4px';
+		body.appendChild(buildChipGroup(allZones, selected));
+
+		mxEvent.addListener(headerRow, 'click', function()
+		{
+			var open = body.style.display !== 'none';
+			body.style.display = open ? 'none' : 'block';
+			arrow.textContent = open ? '▶' : '▼';
+			lbl.textContent = headerText + (selected.length > 0 ? ' (' + selected.length + ' selected)' : ' — optional, click to expand');
+		});
+
+		wrap.appendChild(headerRow);
+		wrap.appendChild(body);
+		return wrap;
+	}
+
+	// ── Title ────────────────────────────────────────────────────────────────
 	var title = document.createElement('h3');
-	title.style.marginTop = '0px';
-	title.style.marginBottom = '8px';
-	title.style.textAlign = 'center';
-	title.style.flexShrink = '0';
+	title.style.cssText = 'margin:0 0 8px 0;text-align:center;flex-shrink:0;';
 	mxUtils.write(title, 'Validation Rules');
 	div.appendChild(title);
 
+	// ── Toolbar ──────────────────────────────────────────────────────────────
 	var toolbar = document.createElement('div');
-	toolbar.style.marginBottom = '8px';
-	toolbar.style.display = 'flex';
-	toolbar.style.alignItems = 'center';
-	toolbar.style.gap = '6px';
-	toolbar.style.flexShrink = '0';
+	toolbar.style.cssText = 'margin-bottom:8px;display:flex;align-items:center;gap:6px;flex-shrink:0;flex-wrap:wrap;';
 
 	var sectionSelect = document.createElement('select');
-	sectionSelect.style.height = '28px';
-	sectionSelect.style.marginRight = '4px';
+	sectionSelect.style.cssText = 'height:28px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.18);' +
+		'color:inherit;border-radius:4px;padding:0 6px;font-size:12px;cursor:pointer;outline:none;';
 	var optEdge = document.createElement('option');
-	optEdge.value = 'edgeRules'; optEdge.text = 'Edge Rules';
+	optEdge.value = 'edgeRules'; optEdge.text = 'Connection Rules';
 	sectionSelect.appendChild(optEdge);
 	var optContainment = document.createElement('option');
-	optContainment.value = 'containmentRules'; optContainment.text = 'Containment Rules';
+	optContainment.value = 'containmentRules'; optContainment.text = 'Placement Rules';
 	sectionSelect.appendChild(optContainment);
 	toolbar.appendChild(sectionSelect);
+
 	div.appendChild(toolbar);
 
-	// Rule list — scrollable, flex-grows to fill space
+	// ── Rule list (fixed height) ─────────────────────────────────────────────
 	var listWrap = document.createElement('div');
-	listWrap.style.border = '1px solid rgba(255,255,255,0.15)';
-	listWrap.style.flex = '1 1 0';
-	listWrap.style.minHeight = '60px';
-	listWrap.style.overflow = 'auto';
-	listWrap.style.marginBottom = '8px';
+	listWrap.style.cssText = 'border:1px solid rgba(255,255,255,0.12);border-radius:6px;' +
+		'flex:0 0 120px;overflow:auto;margin-bottom:8px;';
 	div.appendChild(listWrap);
 
-	// JSON editor panel — fixed height
-	var editorPanel = document.createElement('div');
-	editorPanel.style.flexShrink = '0';
-	editorPanel.style.display = 'flex';
-	editorPanel.style.flexDirection = 'column';
-	editorPanel.style.height = '220px';
-
-	var editorLabel = document.createElement('div');
-	editorLabel.style.fontWeight = 'bold';
-	editorLabel.style.marginBottom = '4px';
-	editorLabel.style.fontSize = '12px';
-	mxUtils.write(editorLabel, 'Rule JSON (select a rule above to edit):');
-	editorPanel.appendChild(editorLabel);
-
-	var textarea = document.createElement('textarea');
-	textarea.style.flex = '1 1 0';
-	textarea.style.width = '100%';
-	textarea.style.resize = 'none';
-	textarea.style.boxSizing = 'border-box';
-	textarea.style.background = 'transparent';
-	textarea.style.color = 'inherit';
-	textarea.style.border = '1px solid rgba(255,255,255,0.2)';
-	textarea.style.padding = '6px';
-	textarea.style.fontFamily = 'monospace';
-	textarea.style.fontSize = '11px';
-	editorPanel.appendChild(textarea);
-
-	var btnRow = document.createElement('div');
-	btnRow.style.display = 'flex';
-	btnRow.style.gap = '6px';
-	btnRow.style.marginTop = '6px';
-	btnRow.style.flexShrink = '0';
-	editorPanel.appendChild(btnRow);
-	div.appendChild(editorPanel);
+	// ── Edit form (flex grow, scrollable) ────────────────────────────────────
+	var formPanel = document.createElement('div');
+	formPanel.style.cssText = 'flex:1 1 0;overflow:auto;border:1px solid rgba(255,255,255,0.12);' +
+		'border-radius:6px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;min-height:200px;';
+	div.appendChild(formPanel);
 
 	var selectedRuleId = null;
 
-	function setEditorValue(rule)
+	// formWhen holds mutable arrays that the chip groups share by reference
+	var formWhen = {
+		fromCategory: [], toCategory: [], fromZone: [], toZone: [],
+		sameZone: false, crossZone: false, sameParent: false,
+		componentCategory: [], zoneId: []
+	};
+
+	function showFormEmpty()
 	{
-		textarea.value = (rule != null) ? JSON.stringify(rule, null, 2) : '';
+		formPanel.innerHTML = '';
+		var hint = document.createElement('div');
+		hint.style.cssText = 'color:#666;font-size:12px;text-align:center;margin-top:24px;line-height:1.6;';
+		hint.textContent = 'Select a rule from the list above to edit it,\nor click "+ New" to create a new one.';
+		formPanel.appendChild(hint);
 	}
 
+	function populateForm(rule)
+	{
+		if (rule == null) { showFormEmpty(); return; }
+		formPanel.innerHTML = '';
+
+		var section = sectionSelect.value;
+		var isEdge  = (section === 'edgeRules');
+		var when    = rule.when || {};
+
+		// Sync formWhen arrays from the rule (chip groups mutate these in place)
+		formWhen.fromCategory      = (when.fromCategory      || []).slice();
+		formWhen.toCategory        = (when.toCategory        || []).slice();
+		formWhen.fromZone          = (when.fromZone          || []).slice();
+		formWhen.toZone            = (when.toZone            || []).slice();
+		formWhen.sameZone          = !!when.sameZone;
+		formWhen.crossZone         = !!when.crossZone;
+		formWhen.sameParent        = !!when.sameParent;
+		formWhen.componentCategory = (when.componentCategory || []).slice();
+		formWhen.zoneId            = (when.zoneId            || []).slice();
+
+		// ── Row 1: Rule ID + Enabled ──────────────────────────────────────
+		var row1 = document.createElement('div');
+		row1.style.cssText = 'display:flex;gap:10px;align-items:flex-end;';
+
+		var idField = document.createElement('div');
+		idField.style.flex = '1';
+		idField.appendChild(makeFieldLabel('Rule ID'));
+		var idInput = makeTextInput(rule.id || '', 'e.g. deny-external-to-database');
+		idField.appendChild(idInput);
+
+		var enabledWrap = document.createElement('label');
+		enabledWrap.style.cssText = 'display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;padding-bottom:6px;flex-shrink:0;';
+		var enabledChk = document.createElement('input');
+		enabledChk.type = 'checkbox';
+		enabledChk.checked = rule.enabled !== false;
+		enabledChk.style.cssText = 'width:14px;height:14px;cursor:pointer;';
+		enabledWrap.appendChild(enabledChk);
+		enabledWrap.appendChild(document.createTextNode('Enabled'));
+
+		row1.appendChild(idField);
+		row1.appendChild(enabledWrap);
+		formPanel.appendChild(row1);
+
+		// ── Row 2: Effect  |  Severity  |  Priority ──────────────────────
+		var row2 = document.createElement('div');
+		row2.style.cssText = 'display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;';
+
+		// Effect — radio buttons
+		var effectField = document.createElement('div');
+		effectField.appendChild(makeFieldLabel('Effect'));
+		var effectWrap = document.createElement('div');
+		effectWrap.style.cssText = 'display:flex;gap:10px;margin-top:2px;';
+		var effectRadioName = 'vr-effect-' + Date.now();
+		['deny', 'allow'].forEach(function(val)
+		{
+			var lbl = document.createElement('label');
+			lbl.style.cssText = 'display:flex;align-items:center;gap:4px;font-size:12px;cursor:pointer;';
+			var radio = document.createElement('input');
+			radio.type = 'radio';
+			radio.name = effectRadioName;
+			radio.value = val;
+			radio.checked = ((rule.effect || 'deny') === val);
+			radio.style.cursor = 'pointer';
+			lbl.appendChild(radio);
+			lbl.appendChild(document.createTextNode(val === 'deny' ? '🚫 Deny' : '✅ Allow'));
+			effectWrap.appendChild(lbl);
+		});
+		effectField.appendChild(effectWrap);
+
+		// Severity — select
+		var severityField = document.createElement('div');
+		severityField.appendChild(makeFieldLabel('Severity'));
+		var severitySelect = makeSelect([
+			{value: 'error',   label: '🔴 Error'},
+			{value: 'warning', label: '🟡 Warning'},
+			{value: 'info',    label: '🔵 Info'}
+		], rule.severity || 'error');
+		severityField.appendChild(severitySelect);
+
+		// Priority — number input
+		var priorityField = document.createElement('div');
+		priorityField.appendChild(makeFieldLabel('Priority'));
+		var priorityInput = document.createElement('input');
+		priorityInput.type = 'number';
+		priorityInput.value = rule.priority != null ? String(rule.priority) : '50';
+		priorityInput.min = '1';
+		priorityInput.max = '9999';
+		priorityInput.placeholder = '1–9999';
+		priorityInput.style.cssText = 'background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.18);' +
+			'border-radius:4px;color:inherit;padding:5px 8px;font-size:12px;width:72px;outline:none;';
+		priorityField.appendChild(priorityInput);
+
+		row2.appendChild(effectField);
+		row2.appendChild(severityField);
+		row2.appendChild(priorityField);
+		formPanel.appendChild(row2);
+
+		// ── When-conditions header ────────────────────────────────────────
+		var whenHeader = document.createElement('div');
+		whenHeader.style.cssText = 'border-top:1px solid rgba(255,255,255,0.1);padding-top:8px;' +
+			'font-weight:600;font-size:11px;color:#777;text-transform:uppercase;letter-spacing:0.5px;';
+		whenHeader.textContent = isEdge ? 'When the Connection is…' : 'When Component Placement is…';
+		formPanel.appendChild(whenHeader);
+
+		if (isEdge)
+		{
+			// From Category chips
+			formPanel.appendChild(makeFieldLabel('From Category — source component type'));
+			formPanel.appendChild(buildChipGroup(allCategories, formWhen.fromCategory));
+
+			// To Category chips
+			formPanel.appendChild(makeFieldLabel('To Category — destination component type'));
+			formPanel.appendChild(buildChipGroup(allCategories, formWhen.toCategory));
+
+			// Zone condition checkboxes
+			var zoneChkRow = document.createElement('div');
+			zoneChkRow.style.cssText = 'display:flex;gap:14px;flex-wrap:wrap;margin-top:2px;';
+
+			function makeToggleCheckbox(labelText, initial, onToggle)
+			{
+				var lbl = document.createElement('label');
+				lbl.style.cssText = 'display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;';
+				var chk = document.createElement('input');
+				chk.type = 'checkbox';
+				chk.checked = !!initial;
+				chk.style.cursor = 'pointer';
+				mxEvent.addListener(chk, 'change', function() { onToggle(chk.checked); });
+				lbl.appendChild(chk);
+				lbl.appendChild(document.createTextNode(labelText));
+				return lbl;
+			}
+
+			zoneChkRow.appendChild(makeToggleCheckbox('Same Zone',          formWhen.sameZone,   function(v) { formWhen.sameZone   = v; }));
+			zoneChkRow.appendChild(makeToggleCheckbox('Cross Zone',          formWhen.crossZone,  function(v) { formWhen.crossZone  = v; }));
+			zoneChkRow.appendChild(makeToggleCheckbox('Same Parent Container', formWhen.sameParent, function(v) { formWhen.sameParent = v; }));
+			formPanel.appendChild(zoneChkRow);
+
+			// Zone filters — always visible
+			formPanel.appendChild(makeFieldLabel('From Zone — source zone (optional)'));
+			formPanel.appendChild(buildChipGroup(allZones, formWhen.fromZone));
+
+			formPanel.appendChild(makeFieldLabel('To Zone — destination zone (optional)'));
+			formPanel.appendChild(buildChipGroup(allZones, formWhen.toZone));
+		}
+		else
+		{
+			// Containment rule — component category + zone
+			formPanel.appendChild(makeFieldLabel('Component Category'));
+			formPanel.appendChild(buildChipGroup(allCategories, formWhen.componentCategory));
+
+			formPanel.appendChild(makeFieldLabel('Placed In Zone(s)'));
+			formPanel.appendChild(buildChipGroup(allZones, formWhen.zoneId));
+		}
+
+		// ── Message ───────────────────────────────────────────────────────
+		formPanel.appendChild(makeFieldLabel('Violation Message'));
+		var msgInput = makeTextInput(rule.message || '', 'Explain why this rule applies…');
+		formPanel.appendChild(msgInput);
+
+		// ── Save Rule button ──────────────────────────────────────────────
+		var saveRow = document.createElement('div');
+		saveRow.style.cssText = 'display:flex;gap:8px;margin-top:2px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.08);';
+
+		var saveRuleBtn = document.createElement('button');
+		saveRuleBtn.className = 'geBtn';
+		saveRuleBtn.style.cssText = 'background:#4a9eff;color:#fff;border:none;font-weight:600;';
+		saveRuleBtn.textContent = 'Save Rule';
+		mxEvent.addListener(saveRuleBtn, 'click', applyFormToOverrides);
+		saveRow.appendChild(saveRuleBtn);
+
+		var cancelRuleBtn = document.createElement('button');
+		cancelRuleBtn.className = 'geBtn';
+		cancelRuleBtn.textContent = 'Cancel';
+		mxEvent.addListener(cancelRuleBtn, 'click', function() { showFormEmpty(); selectedRuleId = null; renderRuleList(); });
+		saveRow.appendChild(cancelRuleBtn);
+
+		formPanel.appendChild(saveRow);
+
+		// ── Write form state back to overrides ────────────────────────────
+		function applyFormToOverrides()
+		{
+			var newId = idInput.value.trim();
+			if (!newId)
+			{
+				editorUi.showError(mxResources.get('error'), 'Rule ID is required.', mxResources.get('ok'));
+				return;
+			}
+
+			// Build when object — only include non-empty conditions
+			var newWhen = {};
+			if (isEdge)
+			{
+				if (formWhen.fromCategory.length > 0) newWhen.fromCategory = formWhen.fromCategory.slice();
+				if (formWhen.toCategory.length   > 0) newWhen.toCategory   = formWhen.toCategory.slice();
+				if (formWhen.fromZone.length      > 0) newWhen.fromZone    = formWhen.fromZone.slice();
+				if (formWhen.toZone.length        > 0) newWhen.toZone      = formWhen.toZone.slice();
+				if (formWhen.sameZone)   newWhen.sameZone   = true;
+				if (formWhen.crossZone)  newWhen.crossZone  = true;
+				if (formWhen.sameParent) newWhen.sameParent = true;
+			}
+			else
+			{
+				if (formWhen.componentCategory.length > 0) newWhen.componentCategory = formWhen.componentCategory.slice();
+				if (formWhen.zoneId.length            > 0) newWhen.zoneId            = formWhen.zoneId.slice();
+			}
+
+			// Read selected effect radio
+			var radios = effectWrap.querySelectorAll('input[type=radio]');
+			var selectedEffect = 'deny';
+			for (var r = 0; r < radios.length; r++) { if (radios[r].checked) { selectedEffect = radios[r].value; break; } }
+
+			var newRule = {
+				id:       newId,
+				enabled:  enabledChk.checked,
+				effect:   selectedEffect,
+				priority: parseInt(priorityInput.value, 10) || 50,
+				severity: severitySelect.value,
+				when:     newWhen,
+				message:  msgInput.value.trim()
+			};
+
+			var sec       = sectionSelect.value;
+			var baseIdSet = buildBaseIdSet(sec);
+			var ovSection = getOrCreateOverrideSection(sec);
+
+			// Remove any existing override entry for the old id
+			for (var i = ovSection.length - 1; i >= 0; i--)
+			{
+				if (ovSection[i] && ovSection[i].id === selectedRuleId) { ovSection.splice(i, 1); }
+			}
+
+			// If id changed and old id was a base rule, tombstone it
+			if (newId !== selectedRuleId && baseIdSet[selectedRuleId])
+			{
+				ovSection.push({id: selectedRuleId, _delete: true});
+			}
+
+			ovSection.push(newRule);
+			commitOverrides();
+			selectedRuleId = newId;
+			renderRuleList();
+		}
+	}
+
+	// ── Rule list renderer ───────────────────────────────────────────────────
 	function renderRuleList()
 	{
 		listWrap.innerHTML = '';
 		var rules = effectiveSection();
-		console.log('[ValidationRulesDialog] renderRuleList — section:', sectionSelect.value, '— rules:', JSON.stringify(rules.map(function(r){ return r.id; })));
 
 		for (var i = 0; i < rules.length; i++)
 		{
 			(function(rule)
 			{
 				var row = document.createElement('div');
-				row.style.padding = '6px 8px';
-				row.style.borderBottom = '1px solid rgba(255,255,255,0.07)';
-				row.style.cursor = 'pointer';
-				row.style.fontSize = '12px';
-				row.style.background = (rule.id === selectedRuleId) ? 'rgba(74,158,255,0.18)' : '';
-				mxUtils.write(row, (rule.id || 'unnamed') + ' [' + (rule.effect || 'allow') + ']' +
-					(rule.enabled === false ? ' — disabled' : ''));
+				var isSelected = (rule.id === selectedRuleId);
+				row.style.cssText = 'padding:6px 10px;border-bottom:1px solid rgba(255,255,255,0.06);' +
+					'cursor:pointer;font-size:12px;display:flex;align-items:center;gap:7px;' +
+					'border-left:2px solid ' + (isSelected ? '#4a9eff' : 'transparent') + ';' +
+					'background:' + (isSelected ? 'rgba(74,158,255,0.12)' : '') + ';';
+
+				// Severity dot
+				var dot = document.createElement('span');
+				dot.style.cssText = 'width:7px;height:7px;border-radius:50%;flex-shrink:0;background:' +
+					(rule.severity === 'error' ? '#e74c3c' : rule.severity === 'warning' ? '#f39c12' : '#3498db') + ';';
+
+				// Effect badge
+				var badge = document.createElement('span');
+				var isDeny = (rule.effect || 'deny') === 'deny';
+				badge.style.cssText = 'font-size:10px;font-weight:700;border-radius:3px;padding:1px 5px;flex-shrink:0;' +
+					(isDeny ? 'background:rgba(192,57,43,0.3);color:#f08080;' : 'background:rgba(39,174,96,0.25);color:#7ef0a0;');
+				badge.textContent = isDeny ? 'DENY' : 'ALLOW';
+
+				// Name
+				var name = document.createElement('span');
+				name.style.cssText = 'flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+				name.textContent = (rule.id || 'unnamed') + (rule.enabled === false ? '  (disabled)' : '');
+
+				row.appendChild(dot);
+				row.appendChild(badge);
+				row.appendChild(name);
+				listWrap.appendChild(row);
 
 				mxEvent.addListener(row, 'click', function()
 				{
 					selectedRuleId = rule.id;
-					setEditorValue(rule);
+					populateForm(rule);
 					renderRuleList();
 				});
-
-				listWrap.appendChild(row);
 			})(rules[i]);
 		}
 
 		if (rules.length === 0)
 		{
 			var empty = document.createElement('div');
-			empty.style.padding = '8px';
-			empty.style.color = '#888';
-			empty.style.fontSize = '12px';
-			mxUtils.write(empty, 'No rules in this section.');
+			empty.style.cssText = 'padding:14px;color:#777;font-size:12px;text-align:center;';
+			empty.textContent = 'No rules. Click "+ New" to add one.';
 			listWrap.appendChild(empty);
 		}
 	}
 
-	// New rule
-	toolbar.appendChild(createButton('New', function()
+	// ── Toolbar buttons ──────────────────────────────────────────────────────
+
+	toolbar.appendChild(createButton('+ New', function()
 	{
 		var idPrefix = (sectionSelect.value === 'edgeRules') ? 'edge-rule-' : 'containment-rule-';
-		var rule = {
-			id: idPrefix + (new Date().getTime()),
-			enabled: true,
-			effect: 'deny',
-			priority: 50,
-			severity: 'error',
-			when: {},
-			message: ''
-		};
+		var rule = {id: idPrefix + Date.now(), enabled: true, effect: 'deny', priority: 50, severity: 'error', when: {}, message: ''};
 		var ovSection = getOrCreateOverrideSection(sectionSelect.value);
 		ovSection.push(rule);
 		commitOverrides();
 		selectedRuleId = rule.id;
-		setEditorValue(rule);
+		populateForm(rule);
 		renderRuleList();
 	}));
 
-	// Delete selected rule
 	toolbar.appendChild(createButton('Delete', function()
 	{
 		if (selectedRuleId == null)
@@ -585,122 +864,51 @@ var ValidationRulesDialog = function(editorUi)
 		}
 
 		var ruleId = selectedRuleId;
-
 		editorUi.confirm('Delete rule "' + ruleId + '"?', function()
 		{
-			var section = sectionSelect.value;
-			var baseIdSet = buildBaseIdSet(section);
+			var sec       = sectionSelect.value;
+			var baseIdSet = buildBaseIdSet(sec);
+			var ovSection = getOrCreateOverrideSection(sec);
 
-			console.group('[ValidationRulesDialog] DELETE confirmed for rule: ' + ruleId);
-			console.log('  section:', section);
-			console.log('  baseIdSet:', JSON.stringify(baseIdSet));
-			console.log('  isBaseRule:', !!baseIdSet[ruleId]);
-			console.log('  overrides BEFORE delete:', JSON.stringify(overrides, null, 2));
-
-			var ovSection = getOrCreateOverrideSection(section);
-
-			// Remove any existing override entry for this id (including prior tombstones)
 			for (var i = ovSection.length - 1; i >= 0; i--)
 			{
 				if (ovSection[i] && ovSection[i].id === ruleId) { ovSection.splice(i, 1); }
 			}
 
-			// If the rule exists in the base schema, add a tombstone so mergeById removes it
-			if (baseIdSet[ruleId])
-			{
-				ovSection.push({id: ruleId, _delete: true});
-				console.log('  → added _delete tombstone for base rule');
-			}
-			else
-			{
-				console.log('  → rule not in base, just removed from overrides (was custom)');
-			}
-
-			console.log('  overrides AFTER delete (before commit):', JSON.stringify(overrides, null, 2));
-			console.groupEnd();
+			if (baseIdSet[ruleId]) { ovSection.push({id: ruleId, _delete: true}); }
 
 			commitOverrides();
 			selectedRuleId = null;
-			setEditorValue(null);
+			showFormEmpty();
 			renderRuleList();
 		});
 	}));
 
-	// Apply JSON: update a rule via the textarea editor
-	btnRow.appendChild(createButton('Apply JSON', function()
-	{
-		if (selectedRuleId == null)
-		{
-			editorUi.showError(mxResources.get('error'), 'Select a rule first.', mxResources.get('ok'));
-			return;
-		}
-
-		try
-		{
-			var parsed = JSON.parse(textarea.value);
-
-			if (parsed == null || parsed.id == null)
-			{
-				throw new Error('Rule requires an id field.');
-			}
-
-			var section = sectionSelect.value;
-			var baseIdSet = buildBaseIdSet(section);
-			var ovSection = getOrCreateOverrideSection(section);
-
-			// Remove any existing override entry for the old id
-			for (var i = ovSection.length - 1; i >= 0; i--)
-			{
-				if (ovSection[i] && ovSection[i].id === selectedRuleId) { ovSection.splice(i, 1); }
-			}
-
-			// If the id changed and the old id was a base rule, tombstone it
-			if (parsed.id !== selectedRuleId && baseIdSet[selectedRuleId])
-			{
-				ovSection.push({id: selectedRuleId, _delete: true});
-			}
-
-			ovSection.push(parsed);
-			commitOverrides();
-			selectedRuleId = parsed.id;
-			renderRuleList();
-		}
-		catch (e)
-		{
-			editorUi.showError(mxResources.get('error'), e.message, mxResources.get('ok'));
-		}
-	}));
-
-	// Save Rules: commit overrides and save the diagram file
-	var saveBtn = createButton('Save Rules', function()
+	// Save Diagram shortcut in toolbar
+	var saveDiagramBtn = createButton('💾 Save Diagram', function()
 	{
 		commitOverrides();
-
 		try
 		{
-			var saveAction = editorUi.actions.get('save');
-			if (saveAction != null) { saveAction.funct(); }
-			else { editorUi.saveFile(false); }
+			var act = editorUi.actions.get('save');
+			if (act) { act.funct(); } else { editorUi.saveFile(false); }
 		}
 		catch (e) {}
-
-		editorUi.showError('Saved', 'Validation rules saved.', mxResources.get('ok'));
+		editorUi.showError('Saved', 'Validation rules saved to diagram file.', mxResources.get('ok'));
 	});
-	saveBtn.style.fontWeight = '600';
-	saveBtn.style.background = '#4a9eff';
-	saveBtn.style.color = '#fff';
-	saveBtn.style.border = 'none';
-	btnRow.appendChild(saveBtn);
+	saveDiagramBtn.style.cssText += 'margin-left:auto;background:#27ae60;color:#fff;border:none;font-weight:600;';
+	toolbar.appendChild(saveDiagramBtn);
 
 	mxEvent.addListener(sectionSelect, 'change', function()
 	{
 		selectedRuleId = null;
-		setEditorValue(null);
+		showFormEmpty();
 		renderRuleList();
 	});
 
 	sectionSelect.value = 'edgeRules';
 	renderRuleList();
+	showFormEmpty();
 
 	div.appendChild(makeSaveDiagramBar(editorUi));
 

@@ -1053,6 +1053,59 @@
 		}
 	});
 
+	editorUi.actions.addAction('extractFirewallAnalysisJson...', function()
+	{
+		if (window.ArchitectureFirewallExtractor == null ||
+			typeof window.ArchitectureFirewallExtractor.buildFirewallAnalysisJson !== 'function')
+		{
+			editorUi.showError(mxResources.get('error'),
+				'FirewallExtractor module is not available.', mxResources.get('ok'));
+			return;
+		}
+
+		var graph  = editorUi.editor.graph;
+		var schema = null;
+
+		if (window.ArchitectureSchemaRegistry != null)
+		{
+			schema = window.ArchitectureSchemaRegistry.refreshEffective(editorUi);
+		}
+
+		var out = window.ArchitectureFirewallExtractor.buildFirewallAnalysisJson(graph, schema);
+		var sv  = out.schemaValidation || {};
+		var sm  = out.summary || {};
+
+		var summaryHtml =
+			'<strong>Firewall Analysis JSON</strong> — ' +
+			'<span style="color:#6f6;">&#10003; ' + (sm.likelyApproved || 0) + ' likely approved</span>' +
+			'&nbsp;|&nbsp;' +
+			'<span style="color:#fa0;">&#9679; ' + (sm.pendingReview || 0) + ' pending review</span>' +
+			'&nbsp;|&nbsp;' +
+			'<span style="color:#f88;">&#9888; ' + (sm.requiresClarification || 0) + ' require clarification</span>' +
+			'<br><span style="color:#aaa;font-size:11px;">&#128203; LLM stub — analysis fields are placeholders for future JIRA/LLM integration.</span>';
+
+		if (sv.failed > 0)
+		{
+			summaryHtml +=
+				'<br><span style="color:#f88;font-weight:600;">&#9888; ' + sv.failed +
+				' validation violation' + (sv.failed !== 1 ? 's' : '') +
+				' found — affected rows have outcome: requires_clarification.</span>';
+		}
+
+		var rawTitle = (document.title || 'diagram').replace(/\s*-\s*draw\.io$/i, '').trim() || 'diagram';
+		var safeBase = rawTitle.replace(/[^a-zA-Z0-9_\-\.]/g, '_');
+
+		var dlg = new JsonExportPreviewDialog(
+			editorUi,
+			'Firewall Analysis JSON (LLM Stub)',
+			out,
+			safeBase + '-firewall-analysis',
+			'<div style="padding:4px 0;">' + summaryHtml + '</div>'
+		);
+		editorUi.showDialog(dlg.container, 820, 620, true, true);
+		dlg.init();
+	});
+
 	var openAddZonesComponentsDialog = openArchitectureAdmin;
 		
 		editorUi.actions.addAction('addZonesComponents...', function()
@@ -5454,25 +5507,29 @@
 					editorUi.menus.addMenuItems(menu, ['-', 'autosave'], parent);
 				}
 				
-			menu.addSeparator(parent);
-			menu.addItem('Extract Diagram JSON', null, function()
-			{
-				editorUi.actions.get('extractDiagramJson').funct();
-			}, parent);
-			menu.addItem('Extract Firewall Requests JSON', null, function()
-			{
-				editorUi.actions.get('extractFirewallRequestsJson').funct();
-			}, parent);
-			menu.addItem('Architecture Admin', null, function()
-			{
-				openArchitectureAdmin();
-			}, parent);
-			menu.addItem('Projects Portal', null, function()
-			{
-				window.open('projects.html', '_blank');
-			}, parent);
-		}
-		else
+		menu.addSeparator(parent);
+		menu.addItem('Export Diagram (.drawio)', null, function()
+		{
+			editorUi.actions.get('extractDiagramJson').funct();
+		}, parent);
+		menu.addItem('Extract Firewall Requests JSON', null, function()
+		{
+			editorUi.actions.get('extractFirewallRequestsJson').funct();
+		}, parent);
+		menu.addItem('Extract Firewall Analysis JSON', null, function()
+		{
+			editorUi.actions.get('extractFirewallAnalysisJson').funct();
+		}, parent);
+		menu.addItem('Architecture Admin', null, function()
+		{
+			openArchitectureAdmin();
+		}, parent);
+		menu.addItem('Projects Portal', null, function()
+		{
+			window.open('projects.html', '_blank');
+		}, parent);
+	}
+	else
 		{
 			var file = this.editorUi.getCurrentFile();
 				
@@ -5603,21 +5660,25 @@
 					this.addMenuItems(menu, ['print'], parent);
 				}
 				
-			menu.addSeparator(parent);
-			menu.addItem('Extract Diagram JSON', null, function()
-			{
-				editorUi.actions.get('extractDiagramJson').funct();
-			}, parent);
-			menu.addItem('Extract Firewall Requests JSON', null, function()
-			{
-				editorUi.actions.get('extractFirewallRequestsJson').funct();
-			}, parent);
-			menu.addItem('Architecture Admin', null, function()
-			{
-				openArchitectureAdmin();
-			}, parent);
-			menu.addItem('Projects Portal', null, function()
-			{
+		menu.addSeparator(parent);
+		menu.addItem('Export Diagram (.drawio)', null, function()
+		{
+			editorUi.actions.get('extractDiagramJson').funct();
+		}, parent);
+		menu.addItem('Extract Firewall Requests JSON', null, function()
+		{
+			editorUi.actions.get('extractFirewallRequestsJson').funct();
+		}, parent);
+		menu.addItem('Extract Firewall Analysis JSON', null, function()
+		{
+			editorUi.actions.get('extractFirewallAnalysisJson').funct();
+		}, parent);
+		menu.addItem('Architecture Admin', null, function()
+		{
+			openArchitectureAdmin();
+		}, parent);
+		menu.addItem('Projects Portal', null, function()
+		{
 				window.open('projects.html', '_blank');
 			}, parent);
 
