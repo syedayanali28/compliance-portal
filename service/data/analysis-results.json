@@ -1,10 +1,10 @@
 [
   {
-    "analysedAt": "2026-04-24T09:48:54.942Z",
+    "analysedAt": "2026-04-27T04:38:54.566Z",
     "jiraKey": "FWREQ-101",
-    "projectId": null,
-    "projectCode": null,
-    "projectName": null,
+    "projectId": "0c81aab9-a1f2-47e5-9638-0c881b7d6cf1",
+    "projectCode": "CSP",
+    "projectName": "CSP Payment Gateway",
     "llmStub": true,
     "outcome": "likely_approved",
     "requiresClarification": false,
@@ -37,11 +37,11 @@
     "jiraCommentId": null
   },
   {
-    "analysedAt": "2026-04-24T09:48:54.942Z",
+    "analysedAt": "2026-04-27T04:38:54.566Z",
     "jiraKey": "FWREQ-102",
-    "projectId": null,
-    "projectCode": null,
-    "projectName": null,
+    "projectId": "acb9e644-471a-4922-b3f4-a4b450b83d44",
+    "projectCode": "COREBANK",
+    "projectName": "Core Banking Modernisation",
     "llmStub": true,
     "outcome": "likely_approved",
     "requiresClarification": false,
@@ -74,7 +74,7 @@
     "jiraCommentId": null
   },
   {
-    "analysedAt": "2026-04-24T09:48:54.942Z",
+    "analysedAt": "2026-04-27T04:38:54.566Z",
     "jiraKey": "FWREQ-103",
     "projectId": null,
     "projectCode": null,

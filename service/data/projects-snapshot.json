@@ -1,1 +1,47 @@
-[]
+[
+  {
+    "id": "0c81aab9-a1f2-47e5-9638-0c881b7d6cf1",
+    "name": "CSP Payment Gateway",
+    "code": "CSP",
+    "team": "BTG",
+    "status": "Active",
+    "members": "Ryan Chan, Raymond So",
+    "description": "Cross-border Sandbox Payments – CSP Phase 2 architecture review covering Kong API Gateway, AI Portal BFF, and Core Banking integration.",
+    "firewallJson": null,
+    "firewallFilename": null,
+    "diagramFilename": null,
+    "linkedAt": null,
+    "firewallLinkedAt": null,
+    "createdAt": "2026-04-27T04:32:26.329Z"
+  },
+  {
+    "id": "acb9e644-471a-4922-b3f4-a4b450b83d44",
+    "name": "Core Banking Modernisation",
+    "code": "COREBANK",
+    "team": "AS1",
+    "status": "Active",
+    "members": "Carol Chan, David Ng",
+    "description": "Modernisation of the Core Banking platform: GL reconciliation, batch processor and Oracle DB migration.",
+    "firewallJson": null,
+    "firewallFilename": null,
+    "diagramFilename": null,
+    "linkedAt": null,
+    "firewallLinkedAt": null,
+    "createdAt": "2026-04-27T04:37:59.615Z"
+  },
+  {
+    "id": "685f1d00-57a4-4459-801e-369ad8522e1f",
+    "name": "ARB Architecture Review",
+    "code": "ARB",
+    "team": "BTG",
+    "status": "On Hold",
+    "members": "Eric Hui",
+    "description": "Quarterly architecture review board pipeline — currently paused pending Q2 governance refresh.",
+    "firewallJson": null,
+    "firewallFilename": null,
+    "diagramFilename": null,
+    "linkedAt": null,
+    "firewallLinkedAt": null,
+    "createdAt": "2026-04-27T04:38:27.993Z"
+  }
+]

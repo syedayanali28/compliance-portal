@@ -1,0 +1,639 @@
+{
+  "generatedAt": "2026-04-24T02:44:03.328Z",
+  "schemaVersion": "1.0.0",
+  "diagramTitle": "CSP Architecture 2.drawio - draw.io",
+  "schemaValidation": {
+    "edgesChecked": 22,
+    "passed": 21,
+    "failed": 1,
+    "violations": [
+      {
+        "edgeId": "u7QrEUaSVojVLwp2lIQY-110",
+        "ruleIds": [
+          "deny-integration-to-backend"
+        ],
+        "message": "Integration components are not allowed to connect to backend components."
+      }
+    ]
+  },
+  "rows": [
+    {
+      "sourceZoneId": "dmz",
+      "sourceZoneLabel": "DMZ",
+      "sourceComponentId": "iam-idp-identity-gateway",
+      "sourceComponentLabel": "IDP Identity Gateway",
+      "sourceCategory": "iam",
+      "destZoneId": "oa-app-dmz",
+      "destZoneLabel": "OA Network - App DMZ",
+      "destComponentId": "middleware-load-balancer",
+      "destComponentLabel": "Load Balancer",
+      "destCategory": "middleware",
+      "firewallType": "physical",
+      "provider": "NSX",
+      "firewallRuleReason": "Cross-zone traffic requires physical NSX firewall.",
+      "protocol": "HTTPS",
+      "ports": "443",
+      "direction": "Outbound",
+      "connectionType": "firewall-request",
+      "originalEdgeId": "u7QrEUaSVojVLwp2lIQY-13",
+      "appliedRuleIds": [
+        "fw-cross-zone-default"
+      ],
+      "validation": {
+        "allowed": true,
+        "violationRuleIds": [],
+        "message": null
+      }
+    },
+    {
+      "sourceZoneId": "dmz",
+      "sourceZoneLabel": "DMZ",
+      "sourceComponentId": "iam-idp-identity-gateway",
+      "sourceComponentLabel": "IDP Identity Gateway",
+      "sourceCategory": "iam",
+      "destZoneId": "oa-app-dmz",
+      "destZoneLabel": "OA Network - App DMZ",
+      "destComponentId": "middleware-load-balancer",
+      "destComponentLabel": "Load Balancer",
+      "destCategory": "middleware",
+      "firewallType": "physical",
+      "provider": "NSX",
+      "firewallRuleReason": "Cross-zone traffic requires physical NSX firewall.",
+      "protocol": "HTTPS",
+      "ports": "443",
+      "direction": "Outbound",
+      "connectionType": "firewall-request",
+      "originalEdgeId": "u7QrEUaSVojVLwp2lIQY-14",
+      "appliedRuleIds": [
+        "fw-cross-zone-default"
+      ],
+      "validation": {
+        "allowed": true,
+        "violationRuleIds": [],
+        "message": null
+      }
+    },
+    {
+      "sourceZoneId": "dmz",
+      "sourceZoneLabel": "DMZ",
+      "sourceComponentId": "compute-web-server",
+      "sourceComponentLabel": "Web Server2&nbsp;",
+      "sourceCategory": "compute",
+      "destZoneId": "oa-app-dmz",
+      "destZoneLabel": "OA Network - App DMZ",
+      "destComponentId": "iam-idp-am",
+      "destComponentLabel": "IDP Access Manager",
+      "destCategory": "iam",
+      "firewallType": "physical",
+      "provider": "NSX",
+      "firewallRuleReason": "Cross-zone traffic requires physical NSX firewall.",
+      "protocol": "HTTPS",
+      "ports": "443",
+      "direction": "Outbound",
+      "connectionType": "firewall-request",
+      "originalEdgeId": "u7QrEUaSVojVLwp2lIQY-19",
+      "appliedRuleIds": [
+        "fw-cross-zone-default"
+      ],
+      "validation": {
+        "allowed": true,
+        "violationRuleIds": [],
+        "message": null
+      }
+    },
+    {
+      "sourceZoneId": "dmz",
+      "sourceZoneLabel": "DMZ",
+      "sourceComponentId": "compute-web-server",
+      "sourceComponentLabel": "Web Server 1",
+      "sourceCategory": "compute",
+      "destZoneId": "oa-app-dmz",
+      "destZoneLabel": "OA Network - App DMZ",
+      "destComponentId": "iam-idp-am",
+      "destComponentLabel": "IDP Access Manager",
+      "destCategory": "iam",
+      "firewallType": "physical",
+      "provider": "NSX",
+      "firewallRuleReason": "Cross-zone traffic requires physical NSX firewall.",
+      "protocol": "HTTPS",
+      "ports": "443",
+      "direction": "Outbound",
+      "connectionType": "firewall-request",
+      "originalEdgeId": "u7QrEUaSVojVLwp2lIQY-21",
+      "appliedRuleIds": [
+        "fw-cross-zone-default"
+      ],
+      "validation": {
+        "allowed": true,
+        "violationRuleIds": [],
+        "message": null
+      }
+    },
+    {
+      "sourceZoneId": "dmz",
+      "sourceZoneLabel": "DMZ",
+      "sourceComponentId": "compute-web-server",
+      "sourceComponentLabel": "Web Server2&nbsp;",
+      "sourceCategory": "compute",
+      "destZoneId": "oa-app-dmz",
+      "destZoneLabel": "OA Network - App DMZ",
+      "destComponentId": "iam-idp-am",
+      "destComponentLabel": "IDP Access Manager",
+      "destCategory": "iam",
+      "firewallType": "physical",
+      "provider": "NSX",
+      "firewallRuleReason": "Cross-zone traffic requires physical NSX firewall.",
+      "protocol": "HTTPS",
+      "ports": "443",
+      "direction": "Outbound",
+      "connectionType": "firewall-request",
+      "originalEdgeId": "u7QrEUaSVojVLwp2lIQY-24",
+      "appliedRuleIds": [
+        "fw-cross-zone-default"
+      ],
+      "validation": {
+        "allowed": true,
+        "violationRuleIds": [],
+        "message": null
+      }
+    },
+    {
+      "sourceZoneId": "dmz",
+      "sourceZoneLabel": "DMZ",
+      "sourceComponentId": "compute-web-server",
+      "sourceComponentLabel": "Web Server 1",
+      "sourceCategory": "compute",
+      "destZoneId": "oa-app-dmz",
+      "destZoneLabel": "OA Network - App DMZ",
+      "destComponentId": "iam-idp-am",
+      "destComponentLabel": "IDP Access Manager",
+      "destCategory": "iam",
+      "firewallType": "physical",
+      "provider": "NSX",
+      "firewallRuleReason": "Cross-zone traffic requires physical NSX firewall.",
+      "protocol": "HTTPS",
+      "ports": "443",
+      "direction": "Outbound",
+      "connectionType": "firewall-request",
+      "originalEdgeId": "u7QrEUaSVojVLwp2lIQY-25",
+      "appliedRuleIds": [
+        "fw-cross-zone-default"
+      ],
+      "validation": {
+        "allowed": true,
+        "violationRuleIds": [],
+        "message": null
+      }
+    },
+    {
+      "sourceZoneId": "oa-private-cloud",
+      "sourceZoneLabel": "OA Network - Private Cloud",
+      "sourceComponentId": "frontend-browser-spa",
+      "sourceComponentLabel": "Browser SPA",
+      "sourceCategory": "frontend",
+      "destZoneId": "k8s-namespace",
+      "destZoneLabel": "app-namespace",
+      "destComponentId": "integration-kong-api-gateway",
+      "destComponentLabel": "Kong API Gateway",
+      "destCategory": "integration",
+      "firewallType": "physical",
+      "provider": "NSX",
+      "firewallRuleReason": "Cross-zone traffic requires physical NSX firewall.",
+      "protocol": "HTTPS",
+      "ports": "443",
+      "direction": "Outbound",
+      "connectionType": "firewall-request",
+      "originalEdgeId": "u7QrEUaSVojVLwp2lIQY-55",
+      "appliedRuleIds": [
+        "fw-cross-zone-default"
+      ],
+      "validation": {
+        "allowed": true,
+        "violationRuleIds": [],
+        "message": null
+      }
+    },
+    {
+      "sourceZoneId": "k8s-namespace",
+      "sourceZoneLabel": "app-namespace",
+      "sourceComponentId": "backend-file-io-svc",
+      "sourceComponentLabel": "File IO Service",
+      "sourceCategory": "backend",
+      "destZoneId": "k8s-cluster",
+      "destZoneLabel": "K8s Cluster",
+      "destComponentId": "storage-s3-bucket",
+      "destComponentLabel": "S3 Bucket",
+      "destCategory": "storage",
+      "firewallType": "physical",
+      "provider": "NSX",
+      "firewallRuleReason": "Cross-zone traffic requires physical NSX firewall.",
+      "protocol": "HTTPS",
+      "ports": "443",
+      "direction": "Outbound",
+      "connectionType": "firewall-request",
+      "originalEdgeId": "u7QrEUaSVojVLwp2lIQY-80",
+      "appliedRuleIds": [
+        "fw-cross-zone-default"
+      ],
+      "validation": {
+        "allowed": true,
+        "violationRuleIds": [],
+        "message": null
+      }
+    },
+    {
+      "sourceZoneId": "k8s-namespace",
+      "sourceZoneLabel": "app-namespace",
+      "sourceComponentId": "security-antivirus",
+      "sourceComponentLabel": "Antivirus Service",
+      "sourceCategory": "security",
+      "destZoneId": "k8s-cluster",
+      "destZoneLabel": "K8s Cluster",
+      "destComponentId": "storage-s3-bucket",
+      "destComponentLabel": "S3 Bucket",
+      "destCategory": "storage",
+      "firewallType": "physical",
+      "provider": "NSX",
+      "firewallRuleReason": "Cross-zone traffic requires physical NSX firewall.",
+      "protocol": "HTTPS",
+      "ports": "443",
+      "direction": "Outbound",
+      "connectionType": "firewall-request",
+      "originalEdgeId": "u7QrEUaSVojVLwp2lIQY-82",
+      "appliedRuleIds": [
+        "fw-cross-zone-default"
+      ],
+      "validation": {
+        "allowed": true,
+        "violationRuleIds": [],
+        "message": null
+      }
+    },
+    {
+      "sourceZoneId": "k8s-namespace",
+      "sourceZoneLabel": "app-namespace",
+      "sourceComponentId": "backend-information-svc",
+      "sourceComponentLabel": "Information Service",
+      "sourceCategory": "backend",
+      "destZoneId": "k8s-cluster",
+      "destZoneLabel": "K8s Cluster",
+      "destComponentId": "database-postgres",
+      "destComponentLabel": "PostgreSQL",
+      "destCategory": "database",
+      "firewallType": "physical",
+      "provider": "NSX",
+      "firewallRuleReason": "Cross-zone traffic requires physical NSX firewall.",
+      "protocol": "HTTPS",
+      "ports": "443",
+      "direction": "Outbound",
+      "connectionType": "firewall-request",
+      "originalEdgeId": "u7QrEUaSVojVLwp2lIQY-92",
+      "appliedRuleIds": [
+        "fw-cross-zone-default"
+      ],
+      "validation": {
+        "allowed": true,
+        "violationRuleIds": [],
+        "message": null
+      }
+    },
+    {
+      "sourceZoneId": "k8s-namespace",
+      "sourceZoneLabel": "app-namespace",
+      "sourceComponentId": "backend-submission-engine",
+      "sourceComponentLabel": "Submission Engine",
+      "sourceCategory": "backend",
+      "destZoneId": "k8s-cluster",
+      "destZoneLabel": "K8s Cluster",
+      "destComponentId": "database-postgres",
+      "destComponentLabel": "PostgreSQL",
+      "destCategory": "database",
+      "firewallType": "physical",
+      "provider": "NSX",
+      "firewallRuleReason": "Cross-zone traffic requires physical NSX firewall.",
+      "protocol": "HTTPS",
+      "ports": "443",
+      "direction": "Outbound",
+      "connectionType": "firewall-request",
+      "originalEdgeId": "mojSd2lsGsP02Xx-1aSc-49",
+      "appliedRuleIds": [
+        "fw-cross-zone-default"
+      ],
+      "validation": {
+        "allowed": true,
+        "violationRuleIds": [],
+        "message": null
+      }
+    },
+    {
+      "sourceZoneId": "k8s-namespace",
+      "sourceZoneLabel": "app-namespace",
+      "sourceComponentId": "backend-notification-svc",
+      "sourceComponentLabel": "Notification Service",
+      "sourceCategory": "backend",
+      "destZoneId": "oa-private-cloud",
+      "destZoneLabel": "OA Network - Private Cloud",
+      "destComponentId": "integration-email-gateway",
+      "destComponentLabel": "Email Gateway",
+      "destCategory": "integration",
+      "firewallType": "physical",
+      "provider": "NSX",
+      "firewallRuleReason": "Cross-zone traffic requires physical NSX firewall.",
+      "protocol": "HTTPS",
+      "ports": "443",
+      "direction": "Outbound",
+      "connectionType": "firewall-request",
+      "originalEdgeId": "u7QrEUaSVojVLwp2lIQY-86",
+      "appliedRuleIds": [
+        "fw-cross-zone-default"
+      ],
+      "validation": {
+        "allowed": true,
+        "violationRuleIds": [],
+        "message": null
+      }
+    },
+    {
+      "sourceZoneId": "oa-private-cloud",
+      "sourceZoneLabel": "OA Network - Private Cloud",
+      "sourceComponentId": "middleware-load-balancer",
+      "sourceComponentLabel": "Load Balancer",
+      "sourceCategory": "middleware",
+      "destZoneId": "k8s-cluster",
+      "destZoneLabel": "K8s Cluster",
+      "destComponentId": "database-postgres",
+      "destComponentLabel": "PostgreSQL",
+      "destCategory": "database",
+      "firewallType": "physical",
+      "provider": "NSX",
+      "firewallRuleReason": "Cross-zone traffic requires physical NSX firewall.",
+      "protocol": "HTTPS",
+      "ports": "443",
+      "direction": "Outbound",
+      "connectionType": "firewall-request",
+      "originalEdgeId": "u7QrEUaSVojVLwp2lIQY-96",
+      "appliedRuleIds": [
+        "fw-cross-zone-default"
+      ],
+      "validation": {
+        "allowed": true,
+        "violationRuleIds": [],
+        "message": null
+      }
+    },
+    {
+      "sourceZoneId": "oa-private-cloud",
+      "sourceZoneLabel": "OA Network - Private Cloud",
+      "sourceComponentId": "frontend-browser-spa",
+      "sourceComponentLabel": "Browser SPA",
+      "sourceCategory": "frontend",
+      "destZoneId": "data-platform",
+      "destZoneLabel": "Data Platform",
+      "destComponentId": "data-dremio",
+      "destComponentLabel": "Dremio",
+      "destCategory": "database",
+      "firewallType": "physical",
+      "provider": "NSX",
+      "firewallRuleReason": "Cross-zone traffic requires physical NSX firewall.",
+      "protocol": "HTTPS",
+      "ports": "443",
+      "direction": "Outbound",
+      "connectionType": "firewall-request",
+      "originalEdgeId": "u7QrEUaSVojVLwp2lIQY-97",
+      "appliedRuleIds": [
+        "fw-cross-zone-default"
+      ],
+      "validation": {
+        "allowed": true,
+        "violationRuleIds": [],
+        "message": null
+      }
+    },
+    {
+      "sourceZoneId": "k8s-cluster",
+      "sourceZoneLabel": "K8s Cluster",
+      "sourceComponentId": "storage-s3-bucket",
+      "sourceComponentLabel": "S3 Bucket",
+      "sourceCategory": "storage",
+      "destZoneId": "data-platform",
+      "destZoneLabel": "Data Platform",
+      "destComponentId": "storage-pure-storage",
+      "destComponentLabel": "Pure Storage",
+      "destCategory": "storage",
+      "firewallType": "physical",
+      "provider": "NSX",
+      "firewallRuleReason": "Cross-zone traffic requires physical NSX firewall.",
+      "protocol": "HTTPS",
+      "ports": "443",
+      "direction": "Outbound",
+      "connectionType": "firewall-request",
+      "originalEdgeId": "u7QrEUaSVojVLwp2lIQY-103",
+      "appliedRuleIds": [
+        "fw-cross-zone-default"
+      ],
+      "validation": {
+        "allowed": true,
+        "violationRuleIds": [],
+        "message": null
+      }
+    },
+    {
+      "sourceZoneId": "k8s-cluster",
+      "sourceZoneLabel": "K8s Cluster",
+      "sourceComponentId": "storage-s3-bucket",
+      "sourceComponentLabel": "S3 Bucket",
+      "sourceCategory": "storage",
+      "destZoneId": "data-platform",
+      "destZoneLabel": "Data Platform",
+      "destComponentId": "storage-pure-storage",
+      "destComponentLabel": "Pure Storage",
+      "destCategory": "storage",
+      "firewallType": "physical",
+      "provider": "NSX",
+      "firewallRuleReason": "Cross-zone traffic requires physical NSX firewall.",
+      "protocol": "HTTPS",
+      "ports": "443",
+      "direction": "Outbound",
+      "connectionType": "firewall-request",
+      "originalEdgeId": "u7QrEUaSVojVLwp2lIQY-104",
+      "appliedRuleIds": [
+        "fw-cross-zone-default"
+      ],
+      "validation": {
+        "allowed": true,
+        "violationRuleIds": [],
+        "message": null
+      }
+    },
+    {
+      "sourceZoneId": "oa-app-dmz",
+      "sourceZoneLabel": "OA Network - App DMZ",
+      "sourceComponentId": "iam-idp-am",
+      "sourceComponentLabel": "IDP Access Manager",
+      "sourceCategory": "iam",
+      "destZoneId": "oa-private-cloud",
+      "destZoneLabel": "OA Network - Private Cloud",
+      "destComponentId": "integration-email-gateway",
+      "destComponentLabel": "Email Gateway",
+      "destCategory": "integration",
+      "firewallType": "physical",
+      "provider": "NSX",
+      "firewallRuleReason": "Cross-zone traffic requires physical NSX firewall.",
+      "protocol": "HTTPS",
+      "ports": "443",
+      "direction": "Outbound",
+      "connectionType": "firewall-request",
+      "originalEdgeId": "u7QrEUaSVojVLwp2lIQY-28",
+      "appliedRuleIds": [
+        "fw-cross-zone-default"
+      ],
+      "validation": {
+        "allowed": true,
+        "violationRuleIds": [],
+        "message": null
+      }
+    },
+    {
+      "sourceZoneId": "g-net",
+      "sourceZoneLabel": "G-net",
+      "sourceComponentId": "frontend-browser-spa",
+      "sourceComponentLabel": "Browser SPA",
+      "sourceCategory": "frontend",
+      "destZoneId": "dmz",
+      "destZoneLabel": "DMZ",
+      "destComponentId": "middleware-external-load-balancer",
+      "destComponentLabel": "External Load Balancer",
+      "destCategory": "middleware",
+      "firewallType": "physical",
+      "provider": "NSX",
+      "firewallRuleReason": "Cross-zone traffic requires physical NSX firewall.",
+      "protocol": "HTTPS",
+      "ports": "443",
+      "direction": "Outbound",
+      "connectionType": "firewall-request",
+      "originalEdgeId": "u7QrEUaSVojVLwp2lIQY-30",
+      "appliedRuleIds": [
+        "fw-cross-zone-default"
+      ],
+      "validation": {
+        "allowed": true,
+        "violationRuleIds": [],
+        "message": null
+      }
+    },
+    {
+      "sourceZoneId": "iclnet",
+      "sourceZoneLabel": "ICLNet",
+      "sourceComponentId": "integration-fts",
+      "sourceComponentLabel": "FTS",
+      "sourceCategory": "integration",
+      "destZoneId": "dmz",
+      "destZoneLabel": "DMZ",
+      "destComponentId": "storage-fts-file-server",
+      "destComponentLabel": "FTS File Server",
+      "destCategory": "storage",
+      "firewallType": "physical",
+      "provider": "NSX",
+      "firewallRuleReason": "Cross-zone traffic requires physical NSX firewall.",
+      "protocol": "HTTPS",
+      "ports": "443",
+      "direction": "Outbound",
+      "connectionType": "firewall-request",
+      "originalEdgeId": "u7QrEUaSVojVLwp2lIQY-37",
+      "appliedRuleIds": [
+        "fw-cross-zone-default"
+      ],
+      "validation": {
+        "allowed": true,
+        "violationRuleIds": [],
+        "message": null
+      }
+    },
+    {
+      "sourceZoneId": "oa-app-dmz",
+      "sourceZoneLabel": "OA Network - App DMZ",
+      "sourceComponentId": "iam-idp-am",
+      "sourceComponentLabel": "IDP Access Manager",
+      "sourceCategory": "iam",
+      "destZoneId": "oa-private-cloud",
+      "destZoneLabel": "OA Network - Private Cloud",
+      "destComponentId": "middleware-load-balancer",
+      "destComponentLabel": "Load Balancer",
+      "destCategory": "middleware",
+      "firewallType": "physical",
+      "provider": "NSX",
+      "firewallRuleReason": "Cross-zone traffic requires physical NSX firewall.",
+      "protocol": "HTTPS",
+      "ports": "443",
+      "direction": "Outbound",
+      "connectionType": "firewall-request",
+      "originalEdgeId": "u7QrEUaSVojVLwp2lIQY-43",
+      "appliedRuleIds": [
+        "fw-cross-zone-default"
+      ],
+      "validation": {
+        "allowed": true,
+        "violationRuleIds": [],
+        "message": null
+      }
+    },
+    {
+      "sourceZoneId": "dmz",
+      "sourceZoneLabel": "DMZ",
+      "sourceComponentId": "storage-fts-file-server",
+      "sourceComponentLabel": "FTS File Server",
+      "sourceCategory": "storage",
+      "destZoneId": "data-platform",
+      "destZoneLabel": "Data Platform",
+      "destComponentId": "storage-pure-storage",
+      "destComponentLabel": "Pure Storage",
+      "destCategory": "storage",
+      "firewallType": "physical",
+      "provider": "NSX",
+      "firewallRuleReason": "Cross-zone traffic requires physical NSX firewall.",
+      "protocol": "HTTPS",
+      "ports": "443",
+      "direction": "Outbound",
+      "connectionType": "firewall-request",
+      "originalEdgeId": "u7QrEUaSVojVLwp2lIQY-108",
+      "appliedRuleIds": [
+        "fw-cross-zone-default"
+      ],
+      "validation": {
+        "allowed": true,
+        "violationRuleIds": [],
+        "message": null
+      }
+    },
+    {
+      "sourceZoneId": "oa-app-dmz",
+      "sourceZoneLabel": "OA Network - App DMZ",
+      "sourceComponentId": "integration-kong-api-gateway",
+      "sourceComponentLabel": "Kong API Gateway",
+      "sourceCategory": "integration",
+      "destZoneId": "k8s-namespace",
+      "destZoneLabel": "app-namespace",
+      "destComponentId": "backend-ai-portal-bff",
+      "destComponentLabel": "AI Portal BFF",
+      "destCategory": "backend",
+      "firewallType": "physical",
+      "provider": "NSX",
+      "firewallRuleReason": "Cross-zone traffic requires physical NSX firewall.",
+      "protocol": "HTTPS",
+      "ports": "443",
+      "direction": "Outbound",
+      "connectionType": "firewall-request",
+      "originalEdgeId": "u7QrEUaSVojVLwp2lIQY-110",
+      "appliedRuleIds": [
+        "fw-cross-zone-default"
+      ],
+      "validation": {
+        "allowed": false,
+        "violationRuleIds": [
+          "deny-integration-to-backend"
+        ],
+        "message": "Integration components are not allowed to connect to backend components."
+      }
+    }
+  ]
+}

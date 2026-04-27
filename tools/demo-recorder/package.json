@@ -1,0 +1,15 @@
+{
+  "name": "hkma-demo-recorder",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Records the CSP Phase 2 architecture walkthrough as MP4 + GIF using Puppeteer",
+  "scripts": {
+    "record": "node recorder.js",
+    "encode": "node encode.js",
+    "all": "node recorder.js && node encode.js"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^4.4.0",
+    "puppeteer": "^23.0.0"
+  }
+}
