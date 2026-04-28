@@ -940,7 +940,12 @@
 			this.addCustomEntries();
 		}
 
-		this.addGeneralPalette(this.customEntries == null);
+		if (this.addArchitecturePalette != null)
+		{
+			this.addArchitecturePalette();
+		}
+
+		this.addGeneralPalette(false);
 		this.addMiscPalette(false);	
 		this.addAdvancedPalette(false);
 		this.addBasicPalette();
@@ -1049,11 +1054,6 @@
 				['BlackBerry', 'Cellphone', 'HTC smartphone', 'iPhone',
 				  'Palm Treo', 'Signaltower off', 'Signaltower on']);
 		this.setCurrentSearchEntryLibrary();
-
-		if (this.addArchitecturePalette != null)
-		{
-			this.addArchitecturePalette();
-		}
 
 		this.addFlowchartPalette();
 		this.addActiveDirectoryPalette();

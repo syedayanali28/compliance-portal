@@ -1014,7 +1014,7 @@
 		{
 			summaryHtml += '<br><span style="color:#f88;font-weight:600;">&#9888; ' + sv.failed +
 				' validation violation' + (sv.failed !== 1 ? 's' : '') +
-				' found. Review before downloading — violating edges are flagged in the JSON below.</span>';
+				' found. Review before exporting — violating edges are flagged in the detail below.</span>';
 		}
 		else
 		{
@@ -1026,10 +1026,11 @@
 		{
 			var dlg = new JsonExportPreviewDialog(
 				editorUi,
-				'Extract Firewall Requests JSON',
+				'Export firewall (IdaC template)',
 				out,
 				'firewall-requests',
-				'<div style="padding:4px 0;">' + summaryHtml + '</div>'
+				'<div style="padding:4px 0;">' + summaryHtml + '</div>',
+				{ idacFirewall: true }
 			);
 			editorUi.showDialog(dlg.container, 800, 600, true, true);
 			dlg.init();
@@ -1123,20 +1124,10 @@
 			window.open('projects.html', '_blank');
 		});
 
-		// Bridge function used by projects.html via window.opener to extract
-		// diagram JSON and firewall requests JSON from the currently open canvas.
+		// Bridge for the portal: native diagram XML only (firewall IdaC is exported separately from the editor).
 		window.extractForProject = function()
 		{
-			var graph = editorUi.editor.graph;
-			var schema = (window.ArchitectureSchemaRegistry != null)
-				? window.ArchitectureSchemaRegistry.getEffective()
-				: null;
 			var title = editorUi.getBaseFilename(true) || 'diagram';
-
-			if (window.ArchitectureFirewallExtractor == null)
-			{
-				throw new Error('FirewallExtractor module is not loaded. Reload the draw.io canvas and try again.');
-			}
 
 			// Export native draw.io XML so it can be dragged back into draw.io
 			var diagramXml = null;
@@ -1151,9 +1142,8 @@
 			}
 
 			return {
-				diagramXml:   diagramXml,
-				filename:     title,
-				firewallJson: window.ArchitectureFirewallExtractor.extract(graph, schema)
+				diagramXml: diagramXml,
+				filename:   title
 			};
 		};
 		
@@ -5512,7 +5502,7 @@
 		{
 			editorUi.actions.get('extractDiagramJson').funct();
 		}, parent);
-		menu.addItem('Extract Firewall Requests JSON', null, function()
+		menu.addItem('Export firewall (IdaC template)', null, function()
 		{
 			editorUi.actions.get('extractFirewallRequestsJson').funct();
 		}, parent);
@@ -5523,10 +5513,6 @@
 		menu.addItem('Architecture Admin', null, function()
 		{
 			openArchitectureAdmin();
-		}, parent);
-		menu.addItem('Projects Portal', null, function()
-		{
-			window.open('projects.html', '_blank');
 		}, parent);
 	}
 	else
@@ -5665,7 +5651,7 @@
 		{
 			editorUi.actions.get('extractDiagramJson').funct();
 		}, parent);
-		menu.addItem('Extract Firewall Requests JSON', null, function()
+		menu.addItem('Export firewall (IdaC template)', null, function()
 		{
 			editorUi.actions.get('extractFirewallRequestsJson').funct();
 		}, parent);
@@ -5677,10 +5663,6 @@
 		{
 			openArchitectureAdmin();
 		}, parent);
-		menu.addItem('Projects Portal', null, function()
-		{
-				window.open('projects.html', '_blank');
-			}, parent);
 
 			this.addMenuItems(menu, ['-', 'close']);
 			}
@@ -5996,4 +5978,82 @@
 			}), parent, null, true);
 		})));
 	};
+
+	/**
+	 * HKMA: "Projects Portal" as a direct menubar control (same strip as File, Edit, …),
+	 * not a dropdown. Refreshes on language / theme changes (menubar rebuild).
+	 */
+	function appendProjectPortalToMenubar(editorUi, menubarContainer)
+	{
+		if (menubarContainer == null)
+		{
+			return;
+		}
+
+		var prev = menubarContainer.querySelector('[data-hkma-project-portal="1"]');
+
+		if (prev != null)
+		{
+			prev.parentNode.removeChild(prev);
+		}
+
+		var btn = document.createElement('a');
+		btn.setAttribute('data-hkma-project-portal', '1');
+		btn.className = 'geItem';
+		btn.setAttribute('href', 'javascript:void(0);');
+		btn.style.cursor = 'pointer';
+		btn.style.flexShrink = '0';
+		btn.style.whiteSpace = 'nowrap';
+		mxUtils.write(btn, 'Projects Portal');
+
+		mxEvent.addListener(btn, 'click', function(evt)
+		{
+			window.open('projects.html', '_blank');
+			mxEvent.consume(evt);
+		});
+
+		var sc = (editorUi != null) ? editorUi.statusContainer : null;
+
+		if (sc != null && sc.parentNode === menubarContainer)
+		{
+			menubarContainer.insertBefore(btn, sc);
+		}
+		else
+		{
+			menubarContainer.appendChild(btn);
+		}
+	}
+
+	var menusCreateMenubarBaseHKMA = Menus.prototype.createMenubar;
+
+	Menus.prototype.createMenubar = function(container)
+	{
+		var menubar = menusCreateMenubarBaseHKMA.apply(this, arguments);
+		var ui = this.editorUi;
+
+		var refreshPortal = mxUtils.bind(this, function()
+		{
+			var mb = (ui != null) ? ui.menubar : null;
+
+			if (mb == null || mb.container == null)
+			{
+				return;
+			}
+
+			appendProjectPortalToMenubar(ui, mb.container);
+		});
+
+		refreshPortal();
+
+		if (ui != null && !ui._hkmaProjectPortalMenubarHooked)
+		{
+			ui._hkmaProjectPortalMenubarHooked = true;
+			ui.addListener('languageChanged', refreshPortal);
+			ui.addListener('currentThemeChanged', refreshPortal);
+		}
+
+		return menubar;
+	};
+
+	Menus.hkmaAppendProjectsPortalToMenubar = appendProjectPortalToMenubar;
 })();

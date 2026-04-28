@@ -3,6 +3,7 @@
 const { analyseFirewallRequest }  = require('../clients/llmClient');
 const { postComment }             = require('../clients/jiraClient');
 const { findMatchingFirewallRow } = require('./projectCorrelator');
+const { getFirewallRows }         = require('./firewallRowsFromProject');
 const config                      = require('../config');
 
 /**
@@ -10,20 +11,11 @@ const config                      = require('../config');
  *
  * @param {object} issue
  * @param {object|null} project  Matched project from the portal snapshot
- * @param {object|null} firewallRow  Matched firewall row from the project's linked JSON
+ * @param {object|null} firewallRow  Matched firewall row from the project's IdaC sheet (or legacy JSON)
  * @returns {object}
  */
 function buildContext(issue, project, firewallRow) {
-  let projectDiagramRules = [];
-
-  if (project && project.firewallJson) {
-    try {
-      const parsed = typeof project.firewallJson === 'string'
-        ? JSON.parse(project.firewallJson)
-        : project.firewallJson;
-      projectDiagramRules = parsed.requests || parsed.rows || (Array.isArray(parsed) ? parsed : []);
-    } catch (_) { /* ignore */ }
-  }
+  const projectDiagramRules = project ? getFirewallRows(project) : [];
 
   return {
     jiraIssue: {

@@ -1888,6 +1888,26 @@ App.prototype.init = function()
 			insertButtonContainer();
 		}
 
+		// HKMA Projects Portal (classic menubar): refresh after theme/language rebuilds.
+		if (this.menubar != null && this.menubar.container != null)
+		{
+			var hkmaProjectsPortalMenubar = mxUtils.bind(this, function()
+			{
+				this.ensureProjectsPortalMenubarLink();
+			});
+
+			if (!this._hkmaProjectsPortalMenubarListeners)
+			{
+				this._hkmaProjectsPortalMenubarListeners = true;
+				this.addListener('languageChanged', hkmaProjectsPortalMenubar);
+				this.addListener('currentThemeChanged', hkmaProjectsPortalMenubar);
+			}
+
+			hkmaProjectsPortalMenubar();
+			window.setTimeout(hkmaProjectsPortalMenubar, 0);
+			window.setTimeout(hkmaProjectsPortalMenubar, 250);
+		}
+
 		if ((Editor.currentTheme == 'kennedy' && urlParams['embed'] == '1') ||
 			(Editor.currentTheme == 'atlas' && urlParams['embed'] != '1'))
 		{
@@ -7713,6 +7733,11 @@ App.prototype.updateHeader = function()
 			toggleElement.setAttribute('title', mxResources.get('collapseExpand'));
 			toggleFormatElement.setAttribute('title', mxResources.get('format') + ' (' + Editor.ctrlKey + '+' + Editor.shiftKey + '+P)');
 		}));
+
+		if (typeof this.ensureProjectsPortalMenubarLink === 'function')
+		{
+			this.ensureProjectsPortalMenubarLink();
+		}
 	}
 
 	this.updateFullscreenState();

@@ -15202,6 +15202,54 @@
 	};
 
 	/**
+	 * HKMA: "Projects Portal" on the classic menubar row (File, Edit, …).
+	 * On EditorUi.prototype so App and other subclasses inherit it after mxUtils.extend.
+	 */
+	EditorUi.prototype.ensureProjectsPortalMenubarLink = function()
+	{
+		if (this.menubar == null || this.menubar.container == null)
+		{
+			return;
+		}
+
+		var c = this.menubar.container;
+		var prev = c.querySelector('[data-hkma-project-portal="1"]');
+
+		if (prev != null)
+		{
+			prev.parentNode.removeChild(prev);
+		}
+
+		var btn = document.createElement('a');
+		btn.setAttribute('data-hkma-project-portal', '1');
+		// Must match File/Edit/… after Menubar.menuCreated: those use geItem, not geMenubar.
+		// geMenubar is the row container style (position absolute, width 100%) and would cover the bar.
+		btn.className = 'geItem';
+		btn.setAttribute('href', 'javascript:void(0);');
+		btn.style.cursor = 'pointer';
+		btn.style.flexShrink = '0';
+		btn.style.whiteSpace = 'nowrap';
+		mxUtils.write(btn, 'Projects Portal');
+
+		mxEvent.addListener(btn, 'click', function(evt)
+		{
+			window.open('projects.html', '_blank');
+			mxEvent.consume(evt);
+		});
+
+		var sc = this.statusContainer;
+
+		if (sc != null && sc.parentNode === c)
+		{
+			c.insertBefore(btn, sc);
+		}
+		else
+		{
+			c.appendChild(btn);
+		}
+	};
+
+	/**
 	 * Overrides image dialog to add image search and Google+.
 	 */
 	EditorUi.prototype.createMenubarForTheme = function(value)
@@ -15225,6 +15273,11 @@
 		{
 			this.buttonContainer.style.display = '';
 			this.menubar.container.appendChild(this.buttonContainer);
+		}
+
+		if (typeof this.ensureProjectsPortalMenubarLink === 'function')
+		{
+			this.ensureProjectsPortalMenubarLink();
 		}
 	};
 

@@ -246,10 +246,13 @@ mxscript(drawDevUrl + 'js/diagramly/mxRuler.js');
 mxscript(drawDevUrl + 'js/diagramly/mxFreehand.js');
 mxscript(drawDevUrl + 'js/diagramly/P2PCollab.js');
 mxscript(drawDevUrl + 'js/diagramly/DevTools.js');
+mxscript(drawDevUrl + 'js/diagramly/architecture/ArchitectureSchemaEmbedded.js');
 mxscript(drawDevUrl + 'js/diagramly/architecture/SchemaRegistry.js');
 mxscript(drawDevUrl + 'js/diagramly/architecture/ValidationEngine.js');
 mxscript(drawDevUrl + 'js/diagramly/architecture/ValidationSelfTest.js');
-mxscript(drawDevUrl + 'js/diagramly/architecture/FirewallExtractor.js');
+		mxscript(drawDevUrl + 'js/diagramly/architecture/FirewallExtractor.js');
+		mxscript(drawDevUrl + 'js/vendor/jszip.min.js');
+		mxscript(drawDevUrl + 'js/diagramly/architecture/FirewallIdacXlsx.js');
 mxscript(drawDevUrl + 'js/diagramly/architecture/ProjectStore.js');
 
 if (!window.DRAWIO_PUBLIC_BUILD)

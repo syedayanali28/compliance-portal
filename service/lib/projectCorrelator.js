@@ -1,6 +1,7 @@
 'use strict';
 
 const { readProjectsSnapshot } = require('./resultStore');
+const { getFirewallRows } = require('./firewallRowsFromProject');
 
 /**
  * Attempt to match a JIRA issue to a project in the portal snapshot.
@@ -56,7 +57,7 @@ function correlateAll(issues) {
 }
 
 /**
- * Given a project (with firewallJson), find the firewall row that best matches
+ * Given a project (IdaC xlsx or legacy firewallJson), find the firewall row that best matches
  * the source/destination component IDs from the JIRA issue custom fields.
  *
  * @param {object} issue
@@ -64,17 +65,10 @@ function correlateAll(issues) {
  * @returns {object|null} Matched firewall row or null
  */
 function findMatchingFirewallRow(issue, project) {
-  if (!project || !project.firewallJson) { return null; }
+  if (!project) { return null; }
 
-  let rows;
-  try {
-    const parsed = typeof project.firewallJson === 'string'
-      ? JSON.parse(project.firewallJson)
-      : project.firewallJson;
-
-    rows = parsed.requests || parsed.rows || (Array.isArray(parsed) ? parsed : []);
-  } catch (err) {
-    console.warn('[correlator] Could not parse project firewallJson:', err.message);
+  const rows = getFirewallRows(project);
+  if (!rows.length) {
     return null;
   }
 

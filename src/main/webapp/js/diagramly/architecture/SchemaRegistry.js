@@ -15,6 +15,41 @@
 	var _effectiveSchema = null;
 	var _loadError = null;
 
+	/**
+	 * Copy of schemas/architecture.schema.json bundled in ArchitectureSchemaEmbedded.js
+	 * when the separate JSON request fails (clone on new machine, wrong document root).
+	 */
+	function getEmbeddedBaseSchema()
+	{
+		if (typeof window === 'undefined' || window.__HKMA_ARCHITECTURE_BASE_SCHEMA__ == null)
+		{
+			return null;
+		}
+
+		try
+		{
+			return JSON.parse(JSON.stringify(window.__HKMA_ARCHITECTURE_BASE_SCHEMA__));
+		}
+		catch (e)
+		{
+			return null;
+		}
+	}
+
+	function adoptEmbeddedBaseIfMissing()
+	{
+		if (_baseSchema == null)
+		{
+			var emb = getEmbeddedBaseSchema();
+
+			if (emb != null)
+			{
+				_baseSchema = emb;
+				_loadError = null;
+			}
+		}
+	}
+
 	function safeClone(obj)
 	{
 		return (obj != null) ? JSON.parse(JSON.stringify(obj)) : null;
@@ -238,12 +273,14 @@
 				_loadError = e;
 			}
 
+			adoptEmbeddedBaseIfMissing();
 			callback(_baseSchema);
 		},
 		function()
 		{
 			_loadError = new Error('Unable to load architecture schema.');
-			callback(null);
+			adoptEmbeddedBaseIfMissing();
+			callback(_baseSchema);
 		});
 	}
 
@@ -258,11 +295,15 @@
 		{
 			var req = mxUtils.load(DEFAULT_SCHEMA_URL + CACHE_BUST);
 			_baseSchema = JSON.parse(req.getText());
+			_loadError = null;
 		}
 		catch (e)
 		{
 			_loadError = e;
+			_baseSchema = null;
 		}
+
+		adoptEmbeddedBaseIfMissing();
 
 		return _baseSchema;
 	}

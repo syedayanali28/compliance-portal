@@ -295,7 +295,9 @@ var StorageDialog = function(editorUi, fn, rowLimit)
  * Schema overrides (zones, components, categories, styles, validation rules,
  * firewall rules) are stored as the attribute "archSchemaOverrides" on the
  * current diagram page's XML node. They travel with the .drawio file and
- * survive browser restarts — BUT only after you save the file.
+ * survive browser restarts — BUT only after you save the file. The canonical
+ * base catalog lives in schemas/architecture.schema.json and is mirrored in
+ * ArchitectureSchemaEmbedded.js when the JSON cannot be fetched.
  * Use the "Save Diagram" button below to persist all pending changes.
  */
 function makeSaveDiagramBar(editorUi)
@@ -993,9 +995,12 @@ var ValidationSelfTestDialog = function(editorUi, results)
  * @param {*}      jsonData    - Any value serialised with JSON.stringify.
  * @param {string} filename    - Suggested download filename (without extension).
  * @param {string} [summaryHtml] - Optional HTML banner shown above the textarea.
+ * @param {object} [options]      - Optional. { idacFirewall: true } — only IdaC .xlsx (JSON is built internally, not shown or downloaded).
  */
-var JsonExportPreviewDialog = function(editorUi, titleText, jsonData, filename, summaryHtml)
+var JsonExportPreviewDialog = function(editorUi, titleText, jsonData, filename, summaryHtml, options)
 {
+	options = options || {};
+	var idacMode = (options.idacFirewall === true && window.ArchitectureFirewallIdac != null);
 	var jsonString = JSON.stringify(jsonData, null, 2);
 
 	var div = document.createElement('div');
@@ -1010,7 +1015,7 @@ var JsonExportPreviewDialog = function(editorUi, titleText, jsonData, filename, 
 	titleEl.style.textAlign = 'center';
 	titleEl.style.margin = '0 0 8px 0';
 	titleEl.style.flexShrink = '0';
-	mxUtils.write(titleEl, titleText || 'JSON Export');
+	mxUtils.write(titleEl, titleText || (idacMode ? 'Export firewall' : 'JSON Export'));
 	div.appendChild(titleEl);
 
 	// Optional summary banner
@@ -1027,22 +1032,26 @@ var JsonExportPreviewDialog = function(editorUi, titleText, jsonData, filename, 
 		div.appendChild(banner);
 	}
 
-	// Textarea
-	var textarea = document.createElement('textarea');
-	textarea.readOnly = true;
-	textarea.value = jsonString;
-	textarea.style.flex = '1 1 auto';
-	textarea.style.width = '100%';
-	textarea.style.boxSizing = 'border-box';
-	textarea.style.fontFamily = 'monospace';
-	textarea.style.fontSize = '11px';
-	textarea.style.resize = 'none';
-	textarea.style.border = '1px solid rgba(255,255,255,0.15)';
-	textarea.style.borderRadius = '3px';
-	textarea.style.padding = '8px';
-	textarea.style.background = 'transparent';
-	textarea.style.color = 'inherit';
-	div.appendChild(textarea);
+	var textarea = null;
+
+	if (!idacMode)
+	{
+		textarea = document.createElement('textarea');
+		textarea.readOnly = true;
+		textarea.value = jsonString;
+		textarea.style.flex = '1 1 auto';
+		textarea.style.width = '100%';
+		textarea.style.boxSizing = 'border-box';
+		textarea.style.fontFamily = 'monospace';
+		textarea.style.fontSize = '11px';
+		textarea.style.resize = 'none';
+		textarea.style.border = '1px solid rgba(255,255,255,0.15)';
+		textarea.style.borderRadius = '3px';
+		textarea.style.padding = '8px';
+		textarea.style.background = 'transparent';
+		textarea.style.color = 'inherit';
+		div.appendChild(textarea);
+	}
 
 	// Buttons
 	var btns = document.createElement('div');
@@ -1051,78 +1060,135 @@ var JsonExportPreviewDialog = function(editorUi, titleText, jsonData, filename, 
 	btns.style.marginTop = '10px';
 	btns.style.flexShrink = '0';
 
-	var copyBtn = document.createElement('button');
-	copyBtn.style.flex = '1';
-	copyBtn.style.padding = '6px';
-	mxUtils.write(copyBtn, 'Copy to Clipboard');
-
-	mxEvent.addListener(copyBtn, 'click', function()
+	if (idacMode)
 	{
-		try
+		var idacBtn = document.createElement('button');
+		idacBtn.style.flex = '1';
+		idacBtn.style.padding = '6px';
+		mxUtils.write(idacBtn, 'Download IdaC (.xlsx)');
+
+		mxEvent.addListener(idacBtn, 'click', function()
 		{
-			if (navigator.clipboard && navigator.clipboard.writeText)
+			var base = (filename || 'firewall-requests');
+			var idacName = window.ArchitectureFirewallIdac.idacFilenameFromJsonName(base + '.json');
+
+			idacBtn.setAttribute('disabled', 'disabled');
+			mxUtils.write(idacBtn, 'Building\u2026');
+
+			window.ArchitectureFirewallIdac.buildXlsxBlob(jsonData, function(blob)
 			{
-				navigator.clipboard.writeText(jsonString).then(function()
+				try
 				{
+					var url = URL.createObjectURL(blob);
+					var a = document.createElement('a');
+					a.href = url;
+					a.download = idacName;
+					document.body.appendChild(a);
+					a.click();
+					document.body.removeChild(a);
+					URL.revokeObjectURL(url);
+				}
+				catch (e)
+				{
+					if (editorUi.showError != null)
+					{
+						editorUi.showError(mxResources.get('error'), (e && e.message) ? e.message : String(e), mxResources.get('ok'));
+					}
+				}
+
+				idacBtn.removeAttribute('disabled');
+				mxUtils.write(idacBtn, 'Download IdaC (.xlsx)');
+			}, function(err)
+			{
+				idacBtn.removeAttribute('disabled');
+				mxUtils.write(idacBtn, 'Download IdaC (.xlsx)');
+
+				if (editorUi.showError != null)
+				{
+					editorUi.showError(mxResources.get('error'), (err && err.message) ? err.message : String(err), mxResources.get('ok'));
+				}
+			});
+		});
+
+		btns.appendChild(idacBtn);
+	}
+	else
+	{
+		var copyBtn = document.createElement('button');
+		copyBtn.style.flex = '1';
+		copyBtn.style.padding = '6px';
+		mxUtils.write(copyBtn, 'Copy to Clipboard');
+
+		mxEvent.addListener(copyBtn, 'click', function()
+		{
+			try
+			{
+				if (navigator.clipboard && navigator.clipboard.writeText)
+				{
+					navigator.clipboard.writeText(jsonString).then(function()
+					{
+						mxUtils.write(copyBtn, 'Copied!');
+						window.setTimeout(function() { copyBtn.innerHTML = ''; mxUtils.write(copyBtn, 'Copy to Clipboard'); }, 1500);
+					});
+				}
+				else
+				{
+					textarea.select();
+					document.execCommand('copy');
 					mxUtils.write(copyBtn, 'Copied!');
 					window.setTimeout(function() { copyBtn.innerHTML = ''; mxUtils.write(copyBtn, 'Copy to Clipboard'); }, 1500);
-				});
+				}
 			}
-			else
-			{
-				textarea.select();
-				document.execCommand('copy');
-				mxUtils.write(copyBtn, 'Copied!');
-				window.setTimeout(function() { copyBtn.innerHTML = ''; mxUtils.write(copyBtn, 'Copy to Clipboard'); }, 1500);
-			}
-		}
-		catch (e) { /* ignore */ }
-	});
+			catch (e) { /* ignore */ }
+		});
 
-	btns.appendChild(copyBtn);
+		var dlBtn = document.createElement('button');
+		dlBtn.style.flex = '1';
+		dlBtn.style.padding = '6px';
+		mxUtils.write(dlBtn, 'Download .json');
 
-	var dlBtn = document.createElement('button');
-	dlBtn.style.flex = '1';
-	dlBtn.style.padding = '6px';
-	mxUtils.write(dlBtn, 'Download .json');
-
-	mxEvent.addListener(dlBtn, 'click', function()
-	{
-		var safeFilename = (filename || 'export') + '.json';
-
-		try
+		mxEvent.addListener(dlBtn, 'click', function()
 		{
-			var blob = new Blob([jsonString], { type: 'application/json' });
-			var url  = URL.createObjectURL(blob);
-			var a    = document.createElement('a');
-			a.href     = url;
-			a.download = safeFilename;
-			document.body.appendChild(a);
-			a.click();
-			document.body.removeChild(a);
-			URL.revokeObjectURL(url);
-		}
-		catch (e)
-		{
-			// Fallback for older browsers
-			if (editorUi.saveData != null)
-			{
-				editorUi.saveData(safeFilename, 'json', jsonString, 'application/json');
-			}
-		}
-	});
+			var safeFilename = (filename || 'export') + '.json';
 
-	btns.appendChild(dlBtn);
+			try
+			{
+				var blob = new Blob([jsonString], { type: 'application/json' });
+				var url  = URL.createObjectURL(blob);
+				var a    = document.createElement('a');
+				a.href     = url;
+				a.download = safeFilename;
+				document.body.appendChild(a);
+				a.click();
+				document.body.removeChild(a);
+				URL.revokeObjectURL(url);
+			}
+			catch (e)
+			{
+				if (editorUi.saveData != null)
+				{
+					editorUi.saveData(safeFilename, 'json', jsonString, 'application/json');
+				}
+			}
+		});
+
+		btns.appendChild(copyBtn);
+		btns.appendChild(dlBtn);
+	}
+
 	div.appendChild(btns);
 
 	this.container = div;
 
 	this.init = function()
 	{
-		window.setTimeout(function()
+		if (textarea != null)
 		{
-			textarea.scrollTop = 0;
-		}, 10);
+			window.setTimeout(function()
+			{
+				textarea.scrollTop = 0;
+			}, 10);
+		}
 	};
 };
 

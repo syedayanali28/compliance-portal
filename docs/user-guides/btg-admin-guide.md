@@ -169,7 +169,7 @@ If the service is offline, you'll see *"Analysis service offline — start `serv
 |---|---|
 | Project records | Browser `localStorage`: key `hkma.projects` |
 | Linked diagram XML | Same `localStorage` record (per-project field `diagramXml`) |
-| Linked firewall JSON | Same `localStorage` record (per-project field `firewallJson`) |
+| Linked firewall (IdaC) | Same `localStorage` record (`firewallIdacXlsxBase64` + filename; rules JSON is not stored) |
 | Open-in-canvas drafts (transient) | `localStorage`: keys starting with `hkma.opendraft.` |
 | Projects snapshot consumed by service | `service/data/projects-snapshot.json` |
 | Analysis results | `service/data/analysis-results.json` |

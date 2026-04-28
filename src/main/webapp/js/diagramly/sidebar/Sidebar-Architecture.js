@@ -51,7 +51,7 @@
 			})(schema.zones[i]);
 		}
 
-		this.addPalette('architectureZones', 'Architecture / Zones', false, mxUtils.bind(this, function(content)
+		this.addPalette('architectureZones', 'Architecture / Zones', true, mxUtils.bind(this, function(content)
 		{
 			for (var i = 0; i < zoneFns.length; i++)
 			{
