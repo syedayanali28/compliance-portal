@@ -68,15 +68,20 @@ if (window.location.hash != null && window.location.hash.substring(0, 2) == '#P'
     }
 }
 
-// Local loopback: use unminified sources (Devel.js + diagramsly/*.js) so HKMA fork
-// changes (e.g. File menu architecture exports) load without rebuilding app.min.js.
-// Override with explicit dev=0 in the URL if you need the minified bundle on localhost.
+// Local loopback and any *.vercel.app deployment: load unminified sources (Devel.js + diagramly/*.js)
+// so HKMA fork features (architecture sidebar, Projects Portal, IdaC, etc.) match local dev without rebuilding app.min.js.
+// Use ?dev=0 in the URL to force the minified bundle on these hosts.
+// Custom domains (CNAME to Vercel) are not matched — add host below or rebuild app.min.js.
 try
 {
-    var loopbackHost = window.location.hostname || '';
+    var loopbackHost = (window.location.hostname || '').toLowerCase();
+    var len = loopbackHost.length;
+    // ES5-safe suffix check (endsWith not required); min host e.g. "x.vercel.app" length 12
+    var onVercelApp = len >= 12 && loopbackHost.substring(len - 11) === '.vercel.app';
+    var useDevSources = loopbackHost === 'localhost' || loopbackHost === '127.0.0.1' ||
+        loopbackHost === '[::1]' || onVercelApp;
 
-    if (urlParams['dev'] != '1' && urlParams['dev'] != '0' &&
-        (loopbackHost === 'localhost' || loopbackHost === '127.0.0.1' || loopbackHost === '[::1]'))
+    if (urlParams['dev'] != '1' && urlParams['dev'] != '0' && useDevSources)
     {
         urlParams['dev'] = '1';
     }
