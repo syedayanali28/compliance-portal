@@ -246,6 +246,7 @@ mxscript(drawDevUrl + 'js/diagramly/mxRuler.js');
 mxscript(drawDevUrl + 'js/diagramly/mxFreehand.js');
 mxscript(drawDevUrl + 'js/diagramly/P2PCollab.js');
 mxscript(drawDevUrl + 'js/diagramly/DevTools.js');
+mxscript(drawDevUrl + 'js/diagramly/architecture/HKMAArchitectureConstants.js');
 mxscript(drawDevUrl + 'js/diagramly/architecture/ArchitectureSchemaEmbedded.js');
 mxscript(drawDevUrl + 'js/diagramly/architecture/SchemaRegistry.js');
 mxscript(drawDevUrl + 'js/diagramly/architecture/ValidationEngine.js');

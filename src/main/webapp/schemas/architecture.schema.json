@@ -448,8 +448,8 @@
         "when": { "sameParent": true },
         "effect": {
           "required": false,
-          "firewallType": "none",
-          "provider": "none",
+          "firewallType": "virtual",
+          "provider": "NSX",
           "reason": "Intra-host / same parent container; no firewall required."
         }
       },

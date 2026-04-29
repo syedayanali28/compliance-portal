@@ -1,0 +1,58 @@
+/**
+ * HKMA: shared top strip aligned with draw.io classic menubar (grapheditor.css
+ * --toolbar-color / --text-color / .geMenubarContainer .geItem).
+ * Use on standalone pages (Projects Portal, Firewall Rules Panel) next to the canvas.
+ */
+.hkma-menubar-strip {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", system-ui,
+    ui-sans-serif, Helvetica, Arial, sans-serif;
+  font-size: 14px;
+  background: #f1f3f4;
+  border-bottom: 1px solid #dadada;
+  color: #3f3f3f;
+  width: 100%;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 200;
+}
+
+.hkma-menubar-strip-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 10px 6px 12px;
+  min-height: 36px;
+  box-sizing: border-box;
+}
+
+.hkma-menubar-strip .hkma-ge-item {
+  display: inline-flex;
+  align-items: center;
+  color: #3f3f3f;
+  text-decoration: none;
+  padding: 4px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  font: inherit;
+  line-height: 1.3;
+}
+
+.hkma-menubar-strip .hkma-ge-item:hover {
+  background: #e2e2e2;
+}
+
+.hkma-menubar-strip .hkma-ge-item.hkma-ge-item--active {
+  background: #d8e5f8;
+  color: #0b57d0;
+  font-weight: 600;
+}
+
+.hkma-menubar-strip .hkma-ge-item:focus-visible {
+  outline: 2px solid #0b57d0;
+  outline-offset: 1px;
+}

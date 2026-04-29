@@ -1,6 +1,7 @@
 /**
  * Writes js/diagramly/architecture/ArchitectureSchemaEmbedded.js from
- * schemas/architecture.schema.json. Run from repo root:
+ * schemas/architecture.schema.json (single source of truth for base firewall +
+ * validation rules and the rest of the HKMA architecture schema). Run from repo root:
  *   node etc/generate-architecture-schema-embedded.js
  */
 'use strict';
@@ -17,10 +18,12 @@ JSON.parse(json); // validate
 
 var banner =
 	'/**\n' +
-	' * Auto-generated from schemas/architecture.schema.json.\n' +
+	' * Auto-generated from schemas/architecture.schema.json (canonical base,\n' +
+	' * including firewallRules + rules). Do not edit by hand.\n' +
 	' * Bundled so Architecture / Zones and Components work when the JSON file\n' +
 	' * cannot be fetched (wrong base URL, file://, or missing static route).\n' +
 	' * Regenerate: node etc/generate-architecture-schema-embedded.js\n' +
+	' * Storage keys: js/diagramly/architecture/HKMAArchitectureConstants.js\n' +
 	' */\n' +
 	'(function()\n' +
 	'{\n' +

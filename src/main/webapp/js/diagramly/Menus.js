@@ -902,52 +902,6 @@
 		action.setToggleAction(true);
 		action.setSelectedCallback(mxUtils.bind(this, function() { return this.tagsWindow != null && this.tagsWindow.window.isVisible(); }));
 
-		editorUi.actions.addAction('validationRules...', function()
-		{
-			var dlg = new ValidationRulesDialog(editorUi);
-			editorUi.showDialog(dlg.container, 760, 560, true, true, function(cancel)
-			{
-				if (!cancel)
-				{
-					dlg.save();
-					editorUi.refreshArchitectureSchema();
-				}
-			});
-			dlg.init();
-		});
-
-		editorUi.actions.addAction('runValidationSelfTest...', function()
-		{
-			if (window.ArchitectureValidationSelfTest == null || window.ArchitectureSchemaRegistry == null)
-			{
-				editorUi.showError(mxResources.get('error'),
-					'Validation self-test module is not available.', mxResources.get('ok'));
-				return;
-			}
-			
-			mxUtils.get('js/diagramly/architecture/ValidationFixtures.json', function(req)
-			{
-				try
-				{
-					var fixtures = JSON.parse(req.getText());
-					var graph = editorUi.editor.graph;
-					var results = window.ArchitectureValidationSelfTest.run(graph, fixtures);
-					var dlg = new ValidationSelfTestDialog(editorUi, results);
-					editorUi.showDialog(dlg.container, 720, 500, true, true);
-					dlg.init();
-				}
-				catch (e)
-				{
-					editorUi.showError(mxResources.get('error'), e.message, mxResources.get('ok'));
-				}
-			},
-			function()
-			{
-				editorUi.showError(mxResources.get('error'),
-					'Could not load ValidationFixtures.json', mxResources.get('ok'));
-			});
-		});
-		
 	var openArchitectureAdmin = function()
 	{
 		var dlg = new ArchitectureCatalogDialog(editorUi);
@@ -4673,16 +4627,6 @@
 				editorUi.menus.addMenuItems(menu, ['-', 'findReplace',
 					'layers', 'tags'], parent);
 				
-				menu.addItem('Validation Rules', null, function()
-				{
-					editorUi.actions.get('validationRules').funct();
-				}, parent);
-				
-				menu.addItem('Run Validation Self-Test', null, function()
-				{
-					editorUi.actions.get('runValidationSelfTest').funct();
-				}, parent);
-				
 				menu.addItem('Architecture Admin', null, function()
 				{
 					editorUi.actions.get('architectureCatalog').funct();
@@ -4705,16 +4649,6 @@
 			else
 			{
 				this.addMenuItems(menu, ['format', 'outline', 'layers', 'tags'], parent);
-				
-				menu.addItem('Validation Rules', null, function()
-				{
-					editorUi.actions.get('validationRules').funct();
-				}, parent);
-				
-				menu.addItem('Run Validation Self-Test', null, function()
-				{
-					editorUi.actions.get('runValidationSelfTest').funct();
-				}, parent);
 				
 				menu.addItem('Architecture Admin', null, function()
 				{
@@ -5980,6 +5914,50 @@
 	};
 
 	/**
+	 * HKMA: "Firewall Rules Panel" and "Projects Portal" as direct menubar controls.
+	 */
+	function appendFirewallRulesPanelToMenubar(editorUi, menubarContainer)
+	{
+		if (menubarContainer == null)
+		{
+			return;
+		}
+
+		var prevFw = menubarContainer.querySelector('[data-hkma-firewall-panel="1"]');
+
+		if (prevFw != null)
+		{
+			prevFw.parentNode.removeChild(prevFw);
+		}
+
+		var btnFw = document.createElement('a');
+		btnFw.setAttribute('data-hkma-firewall-panel', '1');
+		btnFw.className = 'geItem';
+		btnFw.setAttribute('href', 'javascript:void(0);');
+		btnFw.style.cursor = 'pointer';
+		btnFw.style.flexShrink = '0';
+		btnFw.style.whiteSpace = 'nowrap';
+		mxUtils.write(btnFw, 'Firewall Rules Panel');
+
+		mxEvent.addListener(btnFw, 'click', function(evt)
+		{
+			window.open('firewall-rules-panel.html', '_blank');
+			mxEvent.consume(evt);
+		});
+
+		var sc = (editorUi != null) ? editorUi.statusContainer : null;
+
+		if (sc != null && sc.parentNode === menubarContainer)
+		{
+			menubarContainer.insertBefore(btnFw, sc);
+		}
+		else
+		{
+			menubarContainer.appendChild(btnFw);
+		}
+	}
+
+	/**
 	 * HKMA: "Projects Portal" as a direct menubar control (same strip as File, Edit, …),
 	 * not a dropdown. Refreshes on language / theme changes (menubar rebuild).
 	 */
@@ -6013,10 +5991,15 @@
 		});
 
 		var sc = (editorUi != null) ? editorUi.statusContainer : null;
+		var anchorFw = menubarContainer.querySelector('[data-hkma-firewall-panel="1"]');
 
 		if (sc != null && sc.parentNode === menubarContainer)
 		{
 			menubarContainer.insertBefore(btn, sc);
+		}
+		else if (anchorFw != null && anchorFw.parentNode === menubarContainer)
+		{
+			menubarContainer.insertBefore(btn, anchorFw.nextSibling);
 		}
 		else
 		{
@@ -6040,6 +6023,7 @@
 				return;
 			}
 
+			appendFirewallRulesPanelToMenubar(ui, mb.container);
 			appendProjectPortalToMenubar(ui, mb.container);
 		});
 
@@ -6055,5 +6039,6 @@
 		return menubar;
 	};
 
+	Menus.hkmaAppendFirewallRulesPanelToMenubar = appendFirewallRulesPanelToMenubar;
 	Menus.hkmaAppendProjectsPortalToMenubar = appendProjectPortalToMenubar;
 })();

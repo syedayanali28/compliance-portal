@@ -15202,8 +15202,7 @@
 	};
 
 	/**
-	 * HKMA: "Projects Portal" on the classic menubar row (File, Edit, …).
-	 * On EditorUi.prototype so App and other subclasses inherit it after mxUtils.extend.
+	 * HKMA: "Firewall Rules Panel" and "Projects Portal" on the classic menubar row.
 	 */
 	EditorUi.prototype.ensureProjectsPortalMenubarLink = function()
 	{
@@ -15213,6 +15212,13 @@
 		}
 
 		var c = this.menubar.container;
+		var prevFw = c.querySelector('[data-hkma-firewall-panel="1"]');
+
+		if (prevFw != null)
+		{
+			prevFw.parentNode.removeChild(prevFw);
+		}
+
 		var prev = c.querySelector('[data-hkma-project-portal="1"]');
 
 		if (prev != null)
@@ -15220,10 +15226,23 @@
 			prev.parentNode.removeChild(prev);
 		}
 
+		var btnFw = document.createElement('a');
+		btnFw.setAttribute('data-hkma-firewall-panel', '1');
+		btnFw.className = 'geItem';
+		btnFw.setAttribute('href', 'javascript:void(0);');
+		btnFw.style.cursor = 'pointer';
+		btnFw.style.flexShrink = '0';
+		btnFw.style.whiteSpace = 'nowrap';
+		mxUtils.write(btnFw, 'Firewall Rules Panel');
+
+		mxEvent.addListener(btnFw, 'click', function(evt)
+		{
+			window.open('firewall-rules-panel.html', '_blank');
+			mxEvent.consume(evt);
+		});
+
 		var btn = document.createElement('a');
 		btn.setAttribute('data-hkma-project-portal', '1');
-		// Must match File/Edit/… after Menubar.menuCreated: those use geItem, not geMenubar.
-		// geMenubar is the row container style (position absolute, width 100%) and would cover the bar.
 		btn.className = 'geItem';
 		btn.setAttribute('href', 'javascript:void(0);');
 		btn.style.cursor = 'pointer';
@@ -15241,10 +15260,12 @@
 
 		if (sc != null && sc.parentNode === c)
 		{
+			c.insertBefore(btnFw, sc);
 			c.insertBefore(btn, sc);
 		}
 		else
 		{
+			c.appendChild(btnFw);
 			c.appendChild(btn);
 		}
 	};

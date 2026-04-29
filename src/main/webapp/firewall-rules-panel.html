@@ -1,0 +1,1206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HKMA — Firewall &amp; validation</title>
+  <meta name="description" content="HKMA architecture — firewall defaults and validation rules for diagrams.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles/hkma-app-nav.css">
+  <style>
+    /*
+      Colours aligned with www.hkma.gov.hk static CSS (custom-ui.css, Apr 2026):
+      - Primary purple #571A64 (nav, buttons, emphasis); hover #722d80.
+      - Link / accent blue #126BA7 (in-page links, focus ring).
+      - Text #303030 / muted #757575; borders #e2e2e2; panels #f6f6f6, #f1f4f7; alert red #EB0000.
+    */
+    :root {
+      --bg: #f1f4f7;
+      --surface: #ffffff;
+      --surface-2: #f6f6f6;
+      --text: #303030;
+      --text-soft: #333333;
+      --muted: #757575;
+      --border: #e2e2e2;
+      --border-strong: #d4d4d4;
+      --accent: #571a64;
+      --accent-hover: #722d80;
+      --accent-light: #f0e8f3;
+      --link: #126ba7;
+      --focus: #126ba7;
+      --ok: #0d5c2f;
+      --ok-bg: #d1e7dd;
+      --danger: #b00000;
+      --danger-accent: #eb0000;
+      --danger-bg: #fde8e8;
+      --shadow: 0 4px 20px rgba(87, 26, 100, 0.1);
+      --radius: 6px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'IBM Plex Sans', 'Source Sans 3', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+      font-size: 15px;
+    }
+    html, body { height: 100%; }
+    body { display: flex; flex-direction: column; overflow: hidden; }
+    .wrap {
+      max-width: none; width: 100%; margin: 0; padding: 10px 14px 12px; box-sizing: border-box;
+      flex: 1; min-height: 0; display: flex; flex-direction: column;
+    }
+    header.site-header {
+      background: linear-gradient(180deg, #ffffff 0%, var(--surface-2) 100%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 10px 14px;
+      margin-bottom: 10px;
+      box-shadow: var(--shadow);
+      border-left: 4px solid var(--accent);
+      flex-shrink: 0;
+    }
+    .header-row {
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 14px;
+    }
+    .title-block { min-width: 0; }
+    .title-block h1 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: -0.01em;
+      line-height: 1.25;
+    }
+    .title-block .kicker {
+      font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 2px;
+    }
+    .header-actions {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    }
+    .header-actions .btn { padding: 7px 12px; font-size: 12px; }
+    .header-actions .status-pill { margin-left: 0; }
+    .btn {
+      font-family: inherit; font-size: 13px; font-weight: 600;
+      padding: 9px 16px; border-radius: var(--radius); border: 1px solid transparent;
+      cursor: pointer; transition: background 0.12s, border-color 0.12s;
+    }
+    .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-secondary { background: var(--surface); color: var(--text); border-color: var(--border); }
+    .btn-secondary:hover { border-color: var(--border-strong); }
+    .btn-danger { background: #fff; color: var(--danger-accent); border-color: #f5bcbc; }
+    .btn-danger:hover { background: var(--danger-bg); }
+    .status-pill {
+      font-size: 11px; font-weight: 600; color: var(--muted);
+      padding: 5px 10px; background: var(--surface-2); border-radius: 20px; border: 1px solid var(--border);
+    }
+    .status-pill.ok { color: var(--ok); background: var(--ok-bg); border-color: #badbcc; }
+    .status-pill.err { color: var(--danger-accent); background: var(--danger-bg); border-color: #f5bcbc; }
+    .page-main {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    @media (min-width: 960px) {
+      .page-main { overflow: hidden; }
+    }
+    .grid-main {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+      width: 100%;
+      flex: 1;
+      min-height: 0;
+      align-content: start;
+    }
+    @media (min-width: 960px) {
+      .grid-main {
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: minmax(0, 1fr);
+        height: 100%;
+        align-content: stretch;
+      }
+      .grid-main > .card {
+        min-height: 0;
+        height: 100%;
+      }
+    }
+    .card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+      box-shadow: var(--shadow); overflow: hidden;
+      display: flex; flex-direction: column; min-height: 0;
+    }
+    .card-scroll {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      max-height: min(42vh, 420px);
+    }
+    @media (max-height: 700px) {
+      .card-scroll { max-height: min(36vh, 320px); }
+    }
+    @media (min-width: 960px) {
+      .card-scroll {
+        max-height: none;
+        flex: 1;
+        min-height: 0;
+      }
+    }
+    .card-h {
+      padding: 14px 18px; border-bottom: 1px solid var(--border);
+      background: var(--surface-2); display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    }
+    .card-h h2 { font-size: 13px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+    .card-b { padding: 16px 18px; }
+    .card-b.fw-card-body {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      flex: 1;
+    }
+    .fw-card-body > .hint,
+    .fw-card-body > .field,
+    .fw-card-body > div:not(.card-scroll) { flex-shrink: 0; }
+    .field { margin-bottom: 14px; }
+    .field label, .field .lbl {
+      display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 5px;
+    }
+    input[type="text"], input[type="number"], select, textarea {
+      width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--radius);
+      font-family: inherit; font-size: 14px; color: var(--text); background: #fff;
+    }
+    input:focus, select:focus, textarea:focus { outline: 2px solid rgba(18, 107, 167, 0.35); border-color: var(--focus); }
+    textarea { min-height: 72px; resize: vertical; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 640px) { .row2 { grid-template-columns: 1fr; } }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip {
+      padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; cursor: pointer;
+      border: 1px solid var(--border); background: #fff; color: var(--text-soft);
+      transition: background 0.1s, border-color 0.1s, color 0.1s;
+    }
+    .chip.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .chk-row { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 4px; }
+    .chk-row label { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--text-soft); cursor: pointer; }
+    table.data {
+      width: 100%; border-collapse: collapse; font-size: 13px;
+    }
+    table.data th, table.data td {
+      padding: 10px 8px; text-align: left; border-bottom: 1px solid var(--border);
+    }
+    table.data th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); background: var(--surface-2); }
+    table.data tr:hover td { background: #f5f9fc; }
+    .badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px; }
+    .badge-deny { background: var(--danger-bg); color: var(--danger-accent); }
+    .badge-allow { background: #d1e7dd; color: var(--ok); }
+    .tbl-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .tbl-actions button { font-size: 12px; padding: 4px 10px; border-radius: 4px; border: 1px solid var(--border); background: #fff; cursor: pointer; font-weight: 600; color: var(--accent); }
+    .tbl-actions button.del { color: var(--danger-accent); border-color: #f5bcbc; }
+    .tabs { display: flex; gap: 4px; margin-bottom: 12px; }
+    .tabs button {
+      padding: 8px 14px; border: 1px solid var(--border); background: #fff; cursor: pointer; font-weight: 600; font-size: 13px; color: var(--text-soft); border-radius: var(--radius) var(--radius) 0 0;
+    }
+    .tabs button.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .rule-list {
+      flex: 1;
+      min-height: 120px;
+      max-height: min(42vh, 420px);
+      overflow: auto;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 10px;
+    }
+    @media (max-height: 700px) {
+      .rule-list { max-height: min(36vh, 320px); }
+    }
+    @media (min-width: 960px) {
+      .rule-list {
+        max-height: none;
+        flex: 1;
+        min-height: 0;
+        margin-bottom: 0;
+      }
+    }
+    .rule-row {
+      padding: 10px 12px; border-bottom: 1px solid var(--border); cursor: pointer; display: flex; align-items: center; gap: 8px; font-size: 13px;
+    }
+    .rule-row:last-child { border-bottom: none; }
+    .rule-row.on { background: var(--accent-light); border-left: 3px solid var(--accent); }
+    .modal {
+      position: fixed; inset: 0; z-index: 300; display: none; align-items: center; justify-content: center;
+      padding: 16px; box-sizing: border-box;
+    }
+    .modal.open { display: flex; }
+    .modal-backdrop {
+      position: absolute; inset: 0; background: rgba(48, 48, 48, 0.45); cursor: pointer;
+    }
+    .modal-box {
+      position: relative; z-index: 1; background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); width: 100%; max-width: 520px; max-height: min(92vh, 720px);
+      overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow);
+    }
+    .modal-box-h {
+      padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--surface-2);
+      font-size: 15px; font-weight: 700; color: var(--accent); flex-shrink: 0;
+    }
+    .modal-box-b {
+      padding: 14px 16px; overflow-y: auto; flex: 1; min-height: 0;
+    }
+    .modal-actions {
+      display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end;
+      padding: 12px 16px; border-top: 1px solid var(--border); background: var(--surface-2); flex-shrink: 0;
+    }
+    .toast-wrap { position: fixed; bottom: 20px; right: 20px; z-index: 100; display: flex; flex-direction: column; gap: 8px; }
+    .toast { padding: 12px 16px; border-radius: var(--radius); border: 1px solid var(--border); background: #fff; box-shadow: var(--shadow); font-size: 13px; font-weight: 500; max-width: 360px; }
+    .toast.ok { border-color: #badbcc; color: var(--ok); }
+    .toast.err { border-color: #f5bcbc; color: var(--danger-accent); }
+    .hint { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.45; }
+    .mono { font-family: ui-monospace, monospace; font-size: 11px; }
+    .help-box {
+      background: var(--accent-light);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--accent);
+      border-radius: var(--radius);
+      padding: 16px 18px;
+      margin-bottom: 18px;
+      font-size: 14px;
+      color: var(--text-soft);
+      line-height: 1.55;
+    }
+    .help-box h3 {
+      font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--accent); margin-bottom: 12px;
+    }
+    .help-box dl { margin: 0; }
+    .help-box dt {
+      font-weight: 700; color: var(--text); margin-top: 12px; font-size: 14px;
+    }
+    .help-box dt:first-child { margin-top: 0; }
+    .help-box dd { margin: 6px 0 0 0; padding: 0; }
+    .val-card-body { display: flex; flex-direction: column; min-height: 0; flex: 1; overflow: hidden; }
+    .val-card-body .help-box { flex-shrink: 0; }
+    .val-card-body .val-toolbar { flex-shrink: 0; }
+  </style>
+</head>
+<body>
+<nav class="hkma-menubar-strip" aria-label="HKMA navigation">
+  <div class="hkma-menubar-strip-inner">
+    <a class="hkma-ge-item" href="index.html" target="_blank" rel="noopener">Editor</a>
+    <a class="hkma-ge-item hkma-ge-item--active" href="firewall-rules-panel.html" aria-current="page">Firewall Rules Panel</a>
+    <a class="hkma-ge-item" href="projects.html" target="_blank" rel="noopener">Projects Portal</a>
+    <a class="hkma-ge-item" href="#validation-section">Validation rules</a>
+  </div>
+</nav>
+  <div class="wrap">
+    <header class="site-header">
+      <div class="header-row">
+        <div class="title-block">
+          <div class="kicker">HKMA Architecture</div>
+          <h1>Firewall &amp; validation</h1>
+        </div>
+        <div class="header-actions">
+          <button type="button" class="btn btn-primary" id="btnSave" title="Store in this browser and refresh open diagram tabs">Save changes</button>
+          <button type="button" class="btn btn-secondary" id="btnReload">Reload</button>
+          <button type="button" class="btn btn-secondary" id="btnExport">Export</button>
+          <button type="button" class="btn btn-secondary" id="btnImport">Import…</button>
+          <button type="button" class="btn btn-danger" id="btnReset">Reset</button>
+          <span class="status-pill" id="statusPill" role="status">Ready</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="page-main">
+    <div class="grid-main">
+      <section class="card" aria-labelledby="fw-heading">
+        <div class="card-h"><h2 id="fw-heading">Firewall rules</h2></div>
+        <div class="card-b fw-card-body">
+          <p class="hint">Higher <strong>priority</strong> runs first. Match <strong>when</strong> (parent / zone / cross-zone / zones) then apply <strong>effect</strong> (required, type, NSX or PSO, reason).</p>
+          <div class="field row2" style="margin-top:10px;flex-shrink:0">
+            <div>
+              <span class="lbl">Default — firewall required</span>
+              <select id="fwDefRequired"><option value="true">Yes</option><option value="false">No</option></select>
+            </div>
+            <div>
+              <span class="lbl">Default — firewall type</span>
+              <select id="fwDefType">
+                <option value="physical">physical</option>
+                <option value="virtual">virtual</option>
+              </select>
+            </div>
+            <div>
+              <span class="lbl">Default — provider</span>
+              <select id="fwDefProv">
+                <option value="NSX">NSX</option>
+                <option value="PSO">PSO</option>
+              </select>
+            </div>
+          </div>
+          <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;flex-shrink:0">
+            <span class="lbl" style="margin:0">Rules</span>
+            <button type="button" class="btn btn-secondary" id="btnFwAdd">+ Add rule</button>
+          </div>
+          <div class="card-scroll" style="margin-top:8px">
+            <table class="data" id="fwTable"><thead><tr>
+              <th>Priority</th><th>ID</th><th>When</th><th>Effect</th><th>On</th><th></th>
+            </tr></thead><tbody id="fwTbody"></tbody></table>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" id="validation-section" aria-labelledby="val-heading">
+        <div class="card-h"><h2 id="val-heading">Validation rules</h2></div>
+        <div class="card-b val-card-body">
+          <aside class="help-box" aria-labelledby="val-help-title">
+            <h3 id="val-help-title">Which kind of rule do I need?</h3>
+            <dl>
+              <dt>Connection rules</dt>
+              <dd>Use these when the diagram draws a <strong>line between two components</strong>. The check runs on that relationship: from type and zone, to type and zone, and whether the link crosses a boundary you care about. Example: blocking a flow from an internet-facing piece into a restricted area unless policy says otherwise.</dd>
+              <dt>Placement rules</dt>
+              <dd>Use these when a <strong>single component sits inside a zone</strong> and you need to allow or forbid that combination. The check runs on the shape and where it lives, not on a line to another shape. Example: a given component type must not appear inside a particular zone.</dd>
+            </dl>
+          </aside>
+          <div class="tabs" role="tablist">
+            <button type="button" class="on" data-vtab="edge">Connection rules</button>
+            <button type="button" data-vtab="containment">Placement rules</button>
+          </div>
+          <div class="val-toolbar" style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px">
+            <span class="lbl" style="margin:0">Rules in this tab</span>
+            <button type="button" class="btn btn-secondary" id="vE_new">+ Add rule</button>
+          </div>
+          <div class="rule-list" id="valList"></div>
+        </div>
+      </section>
+    </div>
+    </main>
+  </div>
+
+  <div id="fwModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="fwModalTitle">
+    <div class="modal-backdrop" id="fwModalBackdrop"></div>
+    <div class="modal-box">
+      <div class="modal-box-h" id="fwModalTitle">Firewall rule</div>
+      <div class="modal-box-b">
+        <div class="row2">
+          <div class="field">
+            <label for="fwE_id">Rule ID</label>
+            <input id="fwE_id" type="text" autocomplete="off" />
+            <button type="button" class="btn btn-secondary" id="fwE_idSuggest" style="margin-top:8px;font-size:12px;padding:6px 10px">Suggest from zones &amp; conditions</button>
+            <p class="hint" id="fwRuleIdGuide"><strong>Naming:</strong> use stable lowercase kebab-case. Prefer <span class="mono">fw-rule-</span> plus a short scope — usually the <strong>zone ids</strong> you select (e.g. <span class="mono">fw-rule-landing-zone-dmz</span>), or <span class="mono">same-zone</span>, <span class="mono">cross-zone</span>, <span class="mono">same-parent</span> when no zones apply. The ID must be unique across all firewall rules.</p>
+            <p class="hint" id="fwRuleIdWarn" style="display:none;margin-top:6px" role="status"></p>
+          </div>
+          <div class="field"><label for="fwE_pri">Priority</label><input id="fwE_pri" type="number" min="1" max="9999" /></div>
+        </div>
+        <div class="field"><label><input type="checkbox" id="fwE_en" /> Enabled</label></div>
+        <span class="lbl">When</span>
+        <div class="chk-row">
+          <label><input type="checkbox" id="fwW_sameParent" /> Same parent</label>
+          <label><input type="checkbox" id="fwW_sameZone" /> Same zone</label>
+          <label><input type="checkbox" id="fwW_crossZone" /> Cross zone</label>
+        </div>
+        <div class="field" style="margin-top:10px"><span class="lbl">Zones (optional)</span><div class="chips" id="fwW_zones"></div></div>
+        <span class="lbl" style="margin-top:12px">Effect</span>
+        <div class="row2">
+          <div class="field"><span class="lbl">Required</span><select id="fwX_req"><option value="true">true</option><option value="false">false</option></select></div>
+          <div class="field"><span class="lbl">Type</span><select id="fwX_type"><option>physical</option><option>virtual</option></select></div>
+          <div class="field"><span class="lbl">Provider</span><select id="fwX_prov"><option>NSX</option><option>PSO</option></select></div>
+        </div>
+        <div class="field"><label for="fwX_reason">Reason</label><textarea id="fwX_reason"></textarea></div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="fwE_cancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="fwE_apply">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="valModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="valModalTitle">
+    <div class="modal-backdrop" id="valModalBackdrop"></div>
+    <div class="modal-box">
+      <div class="modal-box-h" id="valModalTitle">Validation rule</div>
+      <div class="modal-box-b">
+        <div class="row2">
+          <div class="field"><label for="vE_id">Rule ID</label><input id="vE_id" type="text" /></div>
+          <div class="field"><label for="vE_pri">Priority</label><input id="vE_pri" type="number" min="1" max="9999" /></div>
+        </div>
+        <div class="field"><label><input type="checkbox" id="vE_en" /> Enabled</label></div>
+        <div class="field">
+          <span class="lbl">Effect</span>
+          <div class="chk-row" style="gap:18px">
+            <label><input type="radio" name="vEff" value="deny" /> Deny</label>
+            <label><input type="radio" name="vEff" value="allow" /> Allow</label>
+          </div>
+        </div>
+        <div class="field">
+          <span class="lbl">Severity</span>
+          <select id="vE_sev"><option value="error">Error</option><option value="warning">Warning</option><option value="info">Info</option></select>
+        </div>
+        <div id="valWhenEdge">
+          <span class="lbl">From categories</span><div class="chips" id="v_fromCat"></div>
+          <span class="lbl" style="margin-top:10px">To categories</span><div class="chips" id="v_toCat"></div>
+          <div class="chk-row" style="margin-top:8px">
+            <label><input type="checkbox" id="v_sameZ" /> Same zone</label>
+            <label><input type="checkbox" id="v_crossZ" /> Cross zone</label>
+            <label><input type="checkbox" id="v_sameP" /> Same parent</label>
+          </div>
+          <span class="lbl" style="margin-top:10px">From zones (optional)</span><div class="chips" id="v_fromZ"></div>
+          <span class="lbl" style="margin-top:10px">To zones (optional)</span><div class="chips" id="v_toZ"></div>
+        </div>
+        <div id="valWhenPlace" style="display:none">
+          <span class="lbl">Component categories</span><div class="chips" id="v_compCat"></div>
+          <span class="lbl" style="margin-top:10px">Zones</span><div class="chips" id="v_placeZ"></div>
+        </div>
+        <div class="field"><label for="vE_msg">Violation message</label><textarea id="vE_msg"></textarea></div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary" id="vE_cancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="vE_apply">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast-wrap" id="toasts"></div>
+  <input type="file" id="fileImport" accept="application/json,.json" style="display:none" />
+
+  <script src="js/diagramly/architecture/HKMAArchitectureConstants.js"></script>
+  <script>
+(function() {
+  'use strict';
+  var HK = (typeof window !== 'undefined' && window.HKMAArchitectureConstants) || {};
+  var LS_KEY = HK.GLOBAL_OVERRIDES_LS_KEY || 'hkma.architecture.globalOverrides';
+  var SCHEMA_URL = HK.DEFAULT_SCHEMA_RELATIVE_URL || 'schemas/architecture.schema.json';
+  var BC_NAME = HK.BROADCAST_CHANNEL_NAME || 'hkma-architecture-global';
+
+  var base = null;
+  var bag = {};
+  var zones = [];
+  var categories = [];
+  var fwModel = { default: {}, rules: [] };
+  var rulesModel = { edgeRules: [], containmentRules: [] };
+  var valTab = 'edge';
+  var valSelId = null;
+  var fwEditIndex = null;
+  var fwIsCreate = false;
+  var fwRuleIdAuto = false;
+  var valIsCreate = false;
+
+  function normalizeProvider(p) {
+    p = (p == null ? '' : String(p)).toUpperCase();
+    return p === 'PSO' ? 'PSO' : 'NSX';
+  }
+
+  function normalizeFirewallType(t) {
+    t = (t == null ? '' : String(t)).toLowerCase();
+    return t === 'virtual' ? 'virtual' : 'physical';
+  }
+
+  function normalizeFwModelProviders() {
+    if (!fwModel || !fwModel.default) return;
+    fwModel.default.provider = normalizeProvider(fwModel.default.provider);
+    fwModel.default.firewallType = normalizeFirewallType(fwModel.default.firewallType);
+    (fwModel.rules || []).forEach(function(r) {
+      if (r && r.effect) {
+        r.effect.provider = normalizeProvider(r.effect.provider);
+        r.effect.firewallType = normalizeFirewallType(r.effect.firewallType);
+      }
+    });
+  }
+
+  function openFwModal() {
+    document.getElementById('fwModal').classList.add('open');
+  }
+  function closeFwModal() {
+    document.getElementById('fwModal').classList.remove('open');
+    fwIsCreate = false;
+    fwEditIndex = null;
+    fwRuleIdAuto = false;
+    var w = document.getElementById('fwRuleIdWarn');
+    if (w) { w.textContent = ''; w.style.display = 'none'; }
+  }
+  function openValModal() {
+    document.getElementById('valModal').classList.add('open');
+  }
+  function closeValModal() {
+    document.getElementById('valModal').classList.remove('open');
+    valIsCreate = false;
+  }
+
+  function toast(msg, ok) {
+    var w = document.getElementById('toasts');
+    var t = document.createElement('div');
+    t.className = 'toast ' + (ok ? 'ok' : 'err');
+    t.textContent = msg;
+    w.appendChild(t);
+    setTimeout(function() { if (t.parentNode) t.parentNode.removeChild(t); }, 4000);
+  }
+  function setStatus(t, cls) {
+    var el = document.getElementById('statusPill');
+    el.textContent = t;
+    el.className = 'status-pill' + (cls ? ' ' + cls : '');
+  }
+
+  function readBag() {
+    try {
+      var r = localStorage.getItem(LS_KEY);
+      return r ? JSON.parse(r) : {};
+    } catch (e) { return {}; }
+  }
+  function writeBag(b) {
+    localStorage.setItem(LS_KEY, JSON.stringify(b));
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        var ch = new BroadcastChannel(BC_NAME);
+        ch.postMessage({ type: 'refresh' });
+        ch.close();
+      }
+    } catch (e) {}
+  }
+
+  function mergeById(baseArr, ovrArr) {
+    var map = {};
+    (baseArr || []).forEach(function(item) {
+      if (item && item.id) map[item.id] = JSON.parse(JSON.stringify(item));
+    });
+    (ovrArr || []).forEach(function(item) {
+      if (!item || !item.id) return;
+      if (item._delete) delete map[item.id];
+      else if (map[item.id]) {
+        var o = JSON.parse(JSON.stringify(map[item.id]));
+        for (var k in item) if (item.hasOwnProperty(k) && k !== 'id') o[k] = item[k];
+        map[item.id] = o;
+      } else map[item.id] = JSON.parse(JSON.stringify(item));
+    });
+    return Object.keys(map).map(function(k) { return map[k]; });
+  }
+  function mergeObjects(a, b) {
+    var r = JSON.parse(JSON.stringify(a || {}));
+    b = b || {};
+    for (var k in b) if (b.hasOwnProperty(k)) r[k] = b[k];
+    return r;
+  }
+  function mergeFirewallRules(bf, ov) {
+    bf = bf || { default: {}, rules: [] };
+    ov = ov || { default: {}, rules: [] };
+    return {
+      default: mergeObjects(bf.default || {}, ov.default || {}),
+      rules: mergeById(bf.rules || [], ov.rules || [])
+    };
+  }
+  function mergeRules(br, ov) {
+    br = br || { edgeRules: [], containmentRules: [] };
+    ov = ov || { edgeRules: [], containmentRules: [] };
+    return {
+      edgeRules: mergeById(br.edgeRules || [], ov.edgeRules || []),
+      containmentRules: mergeById(br.containmentRules || [], ov.containmentRules || [])
+    };
+  }
+
+  function effectiveFw() { return mergeFirewallRules(base.firewallRules, bag.firewallRules || {}); }
+  function effectiveRules() { return mergeRules(base.rules || {edgeRules:[],containmentRules:[]}, bag.rules || {}); }
+
+  function syncModelFromBase() {
+    bag = readBag();
+    var ef = effectiveFw();
+    fwModel = { default: JSON.parse(JSON.stringify(ef.default || {})), rules: JSON.parse(JSON.stringify(ef.rules || [])) };
+    rulesModel = effectiveRules();
+    if (!rulesModel.edgeRules) rulesModel.edgeRules = [];
+    if (!rulesModel.containmentRules) rulesModel.containmentRules = [];
+    normalizeFwModelProviders();
+  }
+
+  function whenSummary(w) {
+    w = w || {};
+    var p = [];
+    if (w.sameParent) p.push('sameParent');
+    if (w.sameZone === true) p.push('sameZone');
+    if (w.sameZone === false) p.push('crossZone');
+    if (w.zoneId && w.zoneId.length) p.push('zones:' + w.zoneId.join(','));
+    return p.length ? p.join(', ') : '—';
+  }
+  function effSummary(e) {
+    if (!e) return '—';
+    return (e.required !== false ? 'req ' : 'opt ') + (e.firewallType || '') + ' / ' + (e.provider || '');
+  }
+
+  function renderFwTable() {
+    var tb = document.getElementById('fwTbody');
+    tb.innerHTML = '';
+    var rows = (fwModel.rules || []).slice().sort(function(a,b){ return (b.priority||0)-(a.priority||0); });
+    rows.forEach(function(r) {
+      var tr = document.createElement('tr');
+      var w = r.when || {};
+      var realIdx = fwModel.rules.findIndex(function(x) { return x.id === r.id; });
+      tr.innerHTML =
+        '<td>' + esc(r.priority) + '</td>' +
+        '<td class="mono">' + esc(r.id) + '</td>' +
+        '<td>' + esc(whenSummary(w)) + '</td>' +
+        '<td>' + esc(effSummary(r.effect)) + '</td>' +
+        '<td>' + (r.enabled === false ? 'off' : 'on') + '</td>' +
+        '<td class="tbl-actions"><button type="button" data-fw-i="'+realIdx+'">Edit</button> <button type="button" class="del" data-fw-d="'+realIdx+'">Delete</button></td>';
+      tb.appendChild(tr);
+    });
+    tb.querySelectorAll('button[data-fw-i]').forEach(function(b) {
+      b.onclick = function() { openFwEdit(parseInt(b.getAttribute('data-fw-i'), 10)); };
+    });
+    tb.querySelectorAll('button[data-fw-d]').forEach(function(b) {
+      b.onclick = function() { deleteFwRow(parseInt(b.getAttribute('data-fw-d'), 10)); };
+    });
+  }
+
+  function esc(s) {
+    if (s == null) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function dedupeById(arr, idKey) {
+    idKey = idKey || 'id';
+    var seen = {};
+    var out = [];
+    (arr || []).forEach(function(row) {
+      if (!row) return;
+      var id = row[idKey];
+      if (id == null || id === '') return;
+      var sid = String(id);
+      if (seen[sid]) return;
+      seen[sid] = true;
+      out.push(row);
+    });
+    return out;
+  }
+
+  function chipOptionLabel(displayName, id) {
+    var i = id == null ? '' : String(id).trim();
+    if (i) return i;
+    var d = displayName == null ? '' : String(displayName).trim();
+    return d;
+  }
+
+  function slugifyIdPart(s) {
+    var t = String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    return t || 'x';
+  }
+
+  function buildFwRuleIdBase() {
+    var zs = (document.getElementById('fwW_zones')._sel || []).slice().sort();
+    var sp = document.getElementById('fwW_sameParent').checked;
+    var sz = document.getElementById('fwW_sameZone').checked;
+    var cz = document.getElementById('fwW_crossZone').checked;
+    var tail;
+    if (zs.length) {
+      tail = zs.map(slugifyIdPart).join('-');
+    } else {
+      var parts = [];
+      if (sp) parts.push('same-parent');
+      if (sz) parts.push('same-zone');
+      if (cz) parts.push('cross-zone');
+      tail = parts.length ? parts.join('-') : 'conditions';
+    }
+    return 'fw-rule-' + tail;
+  }
+
+  function ensureUniqueFwRuleId(baseId) {
+    var taken = {};
+    (fwModel.rules || []).forEach(function(r, i) {
+      if (!r || !r.id) return;
+      if (!fwIsCreate && fwEditIndex != null && i === fwEditIndex) return;
+      taken[r.id] = true;
+    });
+    if (!taken[baseId]) return baseId;
+    var n = 2;
+    while (taken[baseId + '-' + n]) n++;
+    return baseId + '-' + n;
+  }
+
+  function applyFwRuleIdSuggestion() {
+    if (!fwRuleIdAuto) return;
+    var id = ensureUniqueFwRuleId(buildFwRuleIdBase());
+    document.getElementById('fwE_id').value = id;
+    updateFwRuleIdHint();
+  }
+
+  function isFwRuleIdDuplicate(id) {
+    for (var i = 0; i < (fwModel.rules || []).length; i++) {
+      var r = fwModel.rules[i];
+      if (!r || r.id !== id) continue;
+      if (!fwIsCreate && fwEditIndex != null && i === fwEditIndex) continue;
+      return true;
+    }
+    return false;
+  }
+
+  function updateFwRuleIdHint() {
+    var warn = document.getElementById('fwRuleIdWarn');
+    if (!warn) return;
+    var id = document.getElementById('fwE_id').value.trim();
+    var parts = [];
+    if (!id) {
+      parts.push('Enter a unique rule ID. New rules start with a suggested id from your zones and checkboxes — edit it or click “Suggest from zones & conditions”.');
+    } else {
+      if (id.length < 10) parts.push('This ID is quite short; a longer name (often including zone ids) is easier to recognise in exports and reviews.');
+      if (!/^fw-rule-/i.test(id)) parts.push('For consistency with the catalogue, prefer an id that starts with fw-rule- plus scope (zones or same-zone / cross-zone / same-parent).');
+      if (isFwRuleIdDuplicate(id)) parts.push('This ID is already used by another rule — change it before saving.');
+    }
+    warn.textContent = parts.join(' ');
+    warn.style.display = parts.length ? 'block' : 'none';
+    warn.style.color = isFwRuleIdDuplicate(id) ? 'var(--danger-accent)' : 'var(--muted)';
+    warn.style.fontWeight = isFwRuleIdDuplicate(id) ? '600' : '500';
+  }
+
+  function openFwEdit(index) {
+    fwIsCreate = false;
+    fwEditIndex = index;
+    fwRuleIdAuto = false;
+    var r = fwModel.rules[index];
+    if (!r) return;
+    document.getElementById('fwModalTitle').textContent = 'Edit firewall rule';
+    document.getElementById('fwE_id').value = r.id || '';
+    document.getElementById('fwE_pri').value = r.priority != null ? r.priority : 500;
+    document.getElementById('fwE_en').checked = r.enabled !== false;
+    var w = r.when || {};
+    document.getElementById('fwW_sameParent').checked = !!w.sameParent;
+    document.getElementById('fwW_sameZone').checked = w.sameZone === true;
+    document.getElementById('fwW_crossZone').checked = w.sameZone === false;
+    renderZoneChips('fwW_zones', w.zoneId || []);
+    var e = r.effect || {};
+    document.getElementById('fwX_req').value = e.required === false ? 'false' : 'true';
+    document.getElementById('fwX_type').value = normalizeFirewallType(e.firewallType);
+    document.getElementById('fwX_prov').value = normalizeProvider(e.provider);
+    document.getElementById('fwX_reason').value = e.reason || '';
+    updateFwRuleIdHint();
+    openFwModal();
+  }
+
+  function openFwCreate() {
+    fwIsCreate = true;
+    fwEditIndex = null;
+    fwRuleIdAuto = true;
+    document.getElementById('fwModalTitle').textContent = 'New firewall rule';
+    document.getElementById('fwE_pri').value = 100;
+    document.getElementById('fwE_en').checked = true;
+    document.getElementById('fwW_sameParent').checked = false;
+    document.getElementById('fwW_sameZone').checked = false;
+    document.getElementById('fwW_crossZone').checked = false;
+    renderZoneChips('fwW_zones', []);
+    applyFwRuleIdSuggestion();
+    document.getElementById('fwX_req').value = 'true';
+    document.getElementById('fwX_type').value = 'physical';
+    document.getElementById('fwX_prov').value = 'NSX';
+    document.getElementById('fwX_reason').value = '';
+    updateFwRuleIdHint();
+    openFwModal();
+  }
+
+  function renderZoneChips(containerId, selected) {
+    var el = document.getElementById(containerId);
+    el.innerHTML = '';
+    zones.forEach(function(z) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'chip' + (selected.indexOf(z.id) >= 0 ? ' on' : '');
+      var lab = z.name || z.id;
+      b.textContent = chipOptionLabel(lab, z.id);
+      b.onclick = function() {
+        var i = selected.indexOf(z.id);
+        if (i >= 0) selected.splice(i, 1); else selected.push(z.id);
+        renderZoneChips(containerId, selected);
+      };
+      el.appendChild(b);
+    });
+    el._sel = selected;
+    if (containerId === 'fwW_zones' && fwRuleIdAuto) applyFwRuleIdSuggestion();
+  }
+
+  function deleteFwRow(index) {
+    if (!confirm('Delete this firewall rule from the working set?')) return;
+    fwModel.rules.splice(index, 1);
+    closeFwModal();
+    renderFwTable();
+    toast('Rule removed (save to persist).', true);
+  }
+
+  document.getElementById('btnFwAdd').onclick = function() {
+    openFwCreate();
+  };
+
+  document.getElementById('fwE_cancel').onclick = function() {
+    closeFwModal();
+  };
+
+  document.getElementById('fwModalBackdrop').onclick = function() {
+    closeFwModal();
+  };
+
+  document.getElementById('fwE_apply').onclick = function() {
+    var r = {
+      id: document.getElementById('fwE_id').value.trim(),
+      priority: parseInt(document.getElementById('fwE_pri').value, 10) || 0,
+      enabled: document.getElementById('fwE_en').checked,
+      when: {},
+      effect: {}
+    };
+    if (!r.id) { toast('Rule ID required.', false); updateFwRuleIdHint(); return; }
+    if (isFwRuleIdDuplicate(r.id)) {
+      toast('That rule ID is already in use. Change the ID or pick a unique suggestion.', false);
+      updateFwRuleIdHint();
+      return;
+    }
+    var w = {};
+    if (document.getElementById('fwW_sameParent').checked) w.sameParent = true;
+    if (document.getElementById('fwW_sameZone').checked) w.sameZone = true;
+    else if (document.getElementById('fwW_crossZone').checked) w.sameZone = false;
+    var zs = document.getElementById('fwW_zones')._sel || [];
+    if (zs.length) w.zoneId = zs.slice();
+    r.when = w;
+    r.effect = {
+      required: document.getElementById('fwX_req').value !== 'false',
+      firewallType: normalizeFirewallType(document.getElementById('fwX_type').value),
+      provider: normalizeProvider(document.getElementById('fwX_prov').value),
+      reason: document.getElementById('fwX_reason').value.trim()
+    };
+    if (fwIsCreate) {
+      fwModel.rules.push(r);
+      fwIsCreate = false;
+    } else if (fwEditIndex != null) {
+      fwModel.rules[fwEditIndex] = r;
+    }
+    closeFwModal();
+    renderFwTable();
+    toast('Rule saved locally — use Save changes to persist.', true);
+  };
+
+  function bindFwDefaults() {
+    var d = fwModel.default || {};
+    document.getElementById('fwDefRequired').value = d.required === false ? 'false' : 'true';
+    document.getElementById('fwDefType').value = normalizeFirewallType(d.firewallType);
+    document.getElementById('fwDefProv').value = normalizeProvider(d.provider);
+  }
+  function readFwDefaults() {
+    fwModel.default = {
+      required: document.getElementById('fwDefRequired').value !== 'false',
+      firewallType: normalizeFirewallType(document.getElementById('fwDefType').value),
+      provider: normalizeProvider(document.getElementById('fwDefProv').value)
+    };
+  }
+
+  /* --- Validation --- */
+  function valSectionArr() {
+    return valTab === 'edge' ? (rulesModel.edgeRules || []) : (rulesModel.containmentRules || []);
+  }
+
+  function renderValList() {
+    var list = document.getElementById('valList');
+    list.innerHTML = '';
+    var rules = valSectionArr();
+    rules.forEach(function(r) {
+      var row = document.createElement('div');
+      row.className = 'rule-row' + (r.id === valSelId ? ' on' : '');
+      var isDeny = (r.effect || 'deny') === 'deny';
+      row.innerHTML =
+        '<span class="badge ' + (isDeny ? 'badge-deny' : 'badge-allow') + '">' + (isDeny ? 'DENY' : 'ALLOW') + '</span>' +
+        '<span style="flex:1;font-weight:600">' + esc(r.id) + '</span>' +
+        '<span style="color:var(--muted);font-size:12px">p' + esc(r.priority) + '</span>' +
+        '<button type="button" class="del" data-val-del="' + esc(r.id) + '" title="Delete">×</button>';
+      row.onclick = function(ev) {
+        if (ev.target && ev.target.getAttribute('data-val-del')) return;
+        openValEdit(r);
+      };
+      var delBtn = row.querySelector('[data-val-del]');
+      if (delBtn) delBtn.onclick = function(ev) {
+        ev.stopPropagation();
+        if (!confirm('Delete rule "' + r.id + '"?')) return;
+        if (document.getElementById('valModal').classList.contains('open') && (valSelId === r.id || valIsCreate)) {
+          closeValModal();
+        }
+        var key = valTab === 'edge' ? 'edgeRules' : 'containmentRules';
+        rulesModel[key] = (rulesModel[key] || []).filter(function(x) { return x.id !== r.id; });
+        valSelId = null;
+        renderValList();
+        toast('Rule removed (save to persist).', true);
+      };
+      list.appendChild(row);
+    });
+    if (!rules.length) {
+      var e = document.createElement('div');
+      e.className = 'rule-row';
+      e.style.color = 'var(--muted)';
+      e.textContent = 'No rules in this section.';
+      list.appendChild(e);
+    }
+  }
+
+  function chipGroup(containerId, items, selected, idField, labelField) {
+    var el = document.getElementById(containerId);
+    el.innerHTML = '';
+    items.forEach(function(it) {
+      var id = it[idField] || it.id;
+      var lab = it[labelField] || it.name || id;
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'chip' + (selected.indexOf(id) >= 0 ? ' on' : '');
+      b.textContent = chipOptionLabel(lab, id);
+      b.onclick = function() {
+        var i = selected.indexOf(id);
+        if (i >= 0) selected.splice(i, 1); else selected.push(id);
+        chipGroup(containerId, items, selected, idField, labelField);
+      };
+      el.appendChild(b);
+    });
+    el._sel = selected;
+  }
+
+  var formV = { fromCat: [], toCat: [], fromZ: [], toZ: [], sameZ: false, crossZ: false, sameP: false, compCat: [], placeZ: [] };
+
+  function populateValForm(rule) {
+    if (!rule) return;
+    document.getElementById('vE_id').value = rule.id || '';
+    document.getElementById('vE_pri').value = rule.priority != null ? rule.priority : 50;
+    document.getElementById('vE_en').checked = rule.enabled !== false;
+    var effVal = rule.effect || 'deny';
+    var rEff = document.querySelector('input[name="vEff"][value="' + effVal + '"]');
+    if (rEff) rEff.checked = true;
+    else document.querySelector('input[name="vEff"][value="deny"]').checked = true;
+    document.getElementById('vE_sev').value = rule.severity || 'error';
+    document.getElementById('vE_msg').value = rule.message || '';
+    var w = rule.when || {};
+    if (valTab === 'edge') {
+      document.getElementById('valWhenEdge').style.display = 'block';
+      document.getElementById('valWhenPlace').style.display = 'none';
+      formV.fromCat = (w.fromCategory || []).slice();
+      formV.toCat = (w.toCategory || []).slice();
+      formV.fromZ = (w.fromZone || []).slice();
+      formV.toZ = (w.toZone || []).slice();
+      formV.sameZ = !!w.sameZone;
+      formV.crossZ = w.sameZone === false;
+      formV.sameP = !!w.sameParent;
+      chipGroup('v_fromCat', categories, formV.fromCat, 'id', 'name');
+      chipGroup('v_toCat', categories, formV.toCat, 'id', 'name');
+      chipGroup('v_fromZ', zones, formV.fromZ, 'id', 'name');
+      chipGroup('v_toZ', zones, formV.toZ, 'id', 'name');
+      document.getElementById('v_sameZ').checked = formV.sameZ;
+      document.getElementById('v_crossZ').checked = formV.crossZ;
+      document.getElementById('v_sameP').checked = formV.sameP;
+    } else {
+      document.getElementById('valWhenEdge').style.display = 'none';
+      document.getElementById('valWhenPlace').style.display = 'block';
+      formV.compCat = (w.componentCategory || []).slice();
+      formV.placeZ = (w.zoneId || []).slice();
+      chipGroup('v_compCat', categories, formV.compCat, 'id', 'name');
+      chipGroup('v_placeZ', zones, formV.placeZ, 'id', 'name');
+    }
+  }
+
+  function openValEdit(rule) {
+    if (!rule) return;
+    valIsCreate = false;
+    valSelId = rule.id;
+    populateValForm(rule);
+    document.getElementById('valModalTitle').textContent = 'Edit: ' + (rule.id || '');
+    openValModal();
+    renderValList();
+  }
+
+  function openValCreate() {
+    valIsCreate = true;
+    valSelId = null;
+    var nid = 'rule-' + Date.now();
+    var nr = { id: nid, enabled: true, effect: 'deny', priority: 50, severity: 'error', when: {}, message: '' };
+    document.getElementById('valModalTitle').textContent = valTab === 'edge' ? 'New connection rule' : 'New placement rule';
+    populateValForm(nr);
+    openValModal();
+  }
+
+  document.querySelectorAll('.tabs button').forEach(function(b) {
+    b.onclick = function() {
+      closeValModal();
+      document.querySelectorAll('.tabs button').forEach(function(x) { x.classList.remove('on'); });
+      b.classList.add('on');
+      valTab = b.getAttribute('data-vtab') === 'containment' ? 'containment' : 'edge';
+      valSelId = null;
+      renderValList();
+    };
+  });
+
+  document.getElementById('vE_new').onclick = function() {
+    openValCreate();
+  };
+
+  document.getElementById('vE_cancel').onclick = function() {
+    closeValModal();
+    renderValList();
+  };
+
+  document.getElementById('valModalBackdrop').onclick = function() {
+    closeValModal();
+    renderValList();
+  };
+
+  document.getElementById('vE_apply').onclick = function() {
+    var id = document.getElementById('vE_id').value.trim();
+    if (!id) { toast('Rule ID required.', false); return; }
+    var key = valTab === 'edge' ? 'edgeRules' : 'containmentRules';
+    var arr = (rulesModel[key] || []).slice();
+    var eff = document.querySelector('input[name="vEff"]:checked');
+    var rule = {
+      id: id,
+      enabled: document.getElementById('vE_en').checked,
+      effect: eff ? eff.value : 'deny',
+      priority: parseInt(document.getElementById('vE_pri').value, 10) || 50,
+      severity: document.getElementById('vE_sev').value,
+      message: document.getElementById('vE_msg').value.trim(),
+      when: {}
+    };
+    if (valTab === 'edge') {
+      var w = {};
+      var fc = document.getElementById('v_fromCat');
+      var tc = document.getElementById('v_toCat');
+      var fz = document.getElementById('v_fromZ');
+      var tz = document.getElementById('v_toZ');
+      if (fc && fc._sel && fc._sel.length) w.fromCategory = fc._sel.slice();
+      if (tc && tc._sel && tc._sel.length) w.toCategory = tc._sel.slice();
+      if (fz && fz._sel && fz._sel.length) w.fromZone = fz._sel.slice();
+      if (tz && tz._sel && tz._sel.length) w.toZone = tz._sel.slice();
+      if (document.getElementById('v_sameZ').checked) w.sameZone = true;
+      else if (document.getElementById('v_crossZ').checked) w.sameZone = false;
+      if (document.getElementById('v_sameP').checked) w.sameParent = true;
+      rule.when = w;
+    } else {
+      var w2 = {};
+      var cc = document.getElementById('v_compCat');
+      var pz = document.getElementById('v_placeZ');
+      if (cc && cc._sel && cc._sel.length) w2.componentCategory = cc._sel.slice();
+      if (pz && pz._sel && pz._sel.length) w2.zoneId = pz._sel.slice();
+      rule.when = w2;
+    }
+    if (valIsCreate) {
+      if (arr.some(function(x) { return x.id === id; })) {
+        toast('That rule ID already exists in this section.', false);
+        return;
+      }
+      arr.push(rule);
+      valIsCreate = false;
+    } else {
+      var idx = arr.findIndex(function(x) { return x.id === valSelId; });
+      if (idx < 0) idx = arr.findIndex(function(x) { return x.id === id; });
+      if (idx >= 0) arr[idx] = rule; else arr.push(rule);
+    }
+    rulesModel[key] = arr;
+    valSelId = id;
+    closeValModal();
+    renderValList();
+    toast('Rule saved locally — use Save changes to persist.', true);
+  };
+
+  document.getElementById('btnSave').onclick = function() {
+    readFwDefaults();
+    bag.firewallRules = JSON.parse(JSON.stringify(fwModel));
+    bag.rules = JSON.parse(JSON.stringify(rulesModel));
+    writeBag(bag);
+    setStatus('Saved ' + new Date().toLocaleTimeString(), 'ok');
+    toast('Organisation overrides saved.', true);
+  };
+
+  document.getElementById('btnReload').onclick = function() {
+    loadAll();
+  };
+
+  document.getElementById('btnReset').onclick = function() {
+    if (!confirm('Clear organisation overrides in this browser?')) return;
+    localStorage.removeItem(LS_KEY);
+    bag = {};
+    try {
+      if (typeof BroadcastChannel !== 'undefined') {
+        var ch = new BroadcastChannel(BC_NAME);
+        ch.postMessage({ type: 'refresh' });
+        ch.close();
+      }
+    } catch (e) {}
+    loadAll();
+    toast('Reset complete.', true);
+  };
+
+  document.getElementById('btnExport').onclick = function() {
+    readFwDefaults();
+    var out = { firewallRules: fwModel, rules: rulesModel };
+    var blob = new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'hkma-architecture-overrides.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  document.getElementById('btnImport').onclick = function() { document.getElementById('fileImport').click(); };
+  document.getElementById('fileImport').onchange = function(ev) {
+    var f = ev.target.files && ev.target.files[0];
+    ev.target.value = '';
+    if (!f) return;
+    var r = new FileReader();
+    r.onload = function() {
+      try {
+        var o = JSON.parse(r.result);
+        if (o.firewallRules) { fwModel = o.firewallRules; normalizeFwModelProviders(); bindFwDefaults(); renderFwTable(); }
+        if (o.rules) { rulesModel = o.rules; renderValList(); }
+        toast('Imported — click Save changes to persist.', true);
+      } catch (e) { toast('Invalid JSON', false); }
+    };
+    r.readAsText(f);
+  };
+
+  function loadAll() {
+    setStatus('Loading…', '');
+    fetch(SCHEMA_URL, { cache: 'no-store' }).then(function(res) {
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
+    }).then(function(j) {
+      base = j;
+      zones = dedupeById((base.zones || []).map(function(z) { return { id: z.id, name: z.name || z.id }; }), 'id');
+      categories = dedupeById((base.componentCategories || []).map(function(c) { return { id: c.id, name: c.name || c.id }; }), 'id');
+      bag = readBag();
+      syncModelFromBase();
+      bindFwDefaults();
+      renderFwTable();
+      renderValList();
+      setStatus('Ready', 'ok');
+    }).catch(function(e) {
+      setStatus('Schema error', 'err');
+      toast(String(e.message || e), false);
+    });
+  }
+
+  ['fwDefRequired','fwDefType','fwDefProv'].forEach(function(id) {
+    document.getElementById(id).onchange = function() { readFwDefaults(); };
+  });
+
+  ['fwW_sameParent', 'fwW_sameZone', 'fwW_crossZone'].forEach(function(fid) {
+    document.getElementById(fid).addEventListener('change', function() {
+      if (fwRuleIdAuto) applyFwRuleIdSuggestion();
+      updateFwRuleIdHint();
+    });
+  });
+  document.getElementById('fwE_id').addEventListener('input', function() {
+    fwRuleIdAuto = false;
+    updateFwRuleIdHint();
+  });
+  document.getElementById('fwE_idSuggest').addEventListener('click', function() {
+    fwRuleIdAuto = true;
+    applyFwRuleIdSuggestion();
+  });
+
+  document.addEventListener('keydown', function(ev) {
+    if (ev.key !== 'Escape') return;
+    if (document.getElementById('fwModal').classList.contains('open')) closeFwModal();
+    if (document.getElementById('valModal').classList.contains('open')) {
+      closeValModal();
+      renderValList();
+    }
+  });
+
+  loadAll();
+})();
+  </script>
+</body>
+</html>

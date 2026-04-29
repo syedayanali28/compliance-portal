@@ -1,10 +1,26 @@
 # Phase 5 — JIRA Integration, Live ARB Linking & LLM Hardening
 ## Implementation Plan
 
-> **Purpose:** This document captures every outstanding change that needs to be implemented on the target device.
-> It covers (1) what was built in Phases 3 & 4, (2) the remaining gap items for the LLM and JIRA poller, and
-> (3) two new capabilities: live JIRA project fetching in the portal and automatic ARB ticket updating when a
-> diagram is linked to a project.
+> **Purpose:** This document captures every outstanding change for Phase 5: (1) what was built in Phases 3 & 4,
+> (2) remaining gaps in the LLM and JIRA poller, and (3) live JIRA project fetching in the portal plus automatic
+> ARB ticket updates when artefacts are linked to a project.
+
+### Where work happens (April 2026)
+
+| Environment | Role |
+|---|---|
+| **Primary workstation** (e.g. canvas / draw.io fork in this repo) | Phases 3–4 UI: architecture sidebar, portal (`projects.html`), optional local `service/` for stub-only checks. |
+| **Other internal device** | **Primary place to develop, configure, and test** JIRA + LLM integration: real `service/.env`, corporate JIRA and LLM endpoints, cron poller, and all Part B–D backend changes. That machine must be able to reach JIRA and the LLM API over the internal network (VPN as required). |
+
+**Why split:** JIRA tokens, LLM keys, and HKMA network routes are often only valid from an approved internal host. Keep secrets on that device; do not commit `.env`.
+
+**Integration contract between machines**
+
+1. **Portal → service URL** — `projects.html` resolves the analysis service (e.g. `getServiceUrl()` or equivalent). On the workstation, point that base URL at the internal device’s reachable address (e.g. `https://analysis-internal.hkma.local:3001` or SSH tunnel). If the URL is wrong, the portal still works offline; JIRA search and ARB updates simply degrade (Part H).
+2. **CORS** — If the portal is opened from a different origin than the service (e.g. file://, `localhost`, or Vercel), ensure `service/server.js` allows the portal origin in CORS for `GET/POST` on `/api/*` (add only hosts you trust).
+3. **Repo sync** — Track Phase 5 code in `dev` (or your release branch) and pull on the internal device before testing; or push from the internal device back to GitHub so CI and the workstation stay aligned.
+
+**Keeping this plan up to date** — When you finish a gap (B1–B7, C*, D*), tick it in your tracker and optionally add a one-line “Done — commit `abc1234`” note under that subsection so the next reader sees reality vs plan.
 
 ---
 
@@ -43,6 +59,7 @@
 ## Part B — Outstanding gaps in the JIRA poller and LLM integration
 
 These are the items that are either incomplete, hardcoded/stubbed, or need hardening before production use.
+**Verify fixes on the internal device** with live JIRA and LLM (see *Where work happens*); use stub mode on the workstation for UI-only iteration when the service URL is not pointed at a configured host.
 
 ### B1 — JIRA client: single project key limitation
 
@@ -405,22 +422,32 @@ async function updateArbTicket({ arbJiraKey, projectName, drawioFileName, firewa
 
 ## Part G — Suggested implementation order
 
+Order assumes **backend-heavy steps on the internal device** (JIRA/LLM live) and **portal UI** on either machine, with the browser pointed at a service URL that hits the internal device.
+
 ```
-Step 1  B7   — Add .env.example (5 min, prerequisite for everything else)
-Step 2  B1   — Fix JQL to cover all projects (30 min)
-Step 3  B6   — Return skipped/status from poller (30 min)
-Step 4  C1   — Add jiraRoutes.js (GET /api/jira/projects + GET /api/jira/arb) (1–2 h)
-Step 5  C2   — Portal JIRA search combo in modal (2–3 h)
-Step 6  C3   — Portal ARB ticket field in modal (1–2 h)
-Step 7  D2   — POST /api/jira/arb-update endpoint (2 h)
-Step 8  D3+D4 — Portal notifyArbTicket() + jiraClient.updateArbTicket() (2 h)
-Step 9  B2   — Attach schema rules to LLM context (1 h)
-Step 10 B3   — Add prompt template (1 h)
-Step 11 B4   — LLM retry loop (1 h)
-Step 12 B5   — Tighten project correlator fuzzy match (1 h)
+Step 1  B7   — Add .env.example (5 min, prerequisite for everything else) — any machine; commit to repo
+Step 2  B1   — Fix JQL / multi-project config (30 min) — internal device + real JIRA
+Step 3  B6   — Return skipped/status from poller (30 min) — internal device; verify with GET /api/status
+Step 4  C1   — Add jiraRoutes.js (GET /api/jira/projects + GET /api/jira/arb) (1–2 h) — internal device
+Step 5  C2   — Portal JIRA search combo in modal (2–3 h) — workstation; test against internal service URL
+Step 6  C3   — Portal ARB ticket field in modal (1–2 h) — workstation; test against internal service URL
+Step 7  D2   — POST /api/jira/arb-update endpoint (2 h) — internal device
+Step 8  D3+D4 — Portal notifyArbTicket() + jiraClient.updateArbTicket() (2 h) — split: portal JS vs jiraClient
+Step 9  B2   — Attach schema rules to LLM context (1 h) — internal device (schema file on same host as service)
+Step 10 B3   — Add prompt template (1 h) — internal device
+Step 11 B4   — LLM retry loop (1 h) — internal device (exercise real LLM timeouts/429s)
+Step 12 B5   — Tighten project correlator fuzzy match (1 h) — internal device with fixture + real issue samples
 ```
 
-**Total estimated effort:** ~2 days of focused development.
+**Total estimated effort:** ~2 days of focused development (add buffer for internal network / token approval on first connect).
+
+**Smoke checklist on the internal device (before signing off Phase 5)**
+
+1. `GET /api/status` returns expected `stubMode`, `lastRun`, and not stuck `running: true` after a poll completes.  
+2. `POST /api/run` with poller idle returns success; second concurrent call returns `skipped` with reason (B6).  
+3. One real firewall issue row: LLM path returns non-stub JSON **or** explicit `llmError` after retries (B4).  
+4. JQL returns issues from more than one JIRA project when configured (B1).  
+5. From the workstation browser: portal modal JIRA search returns rows when service URL points at internal device (C2).
 
 ---
 
@@ -441,3 +468,8 @@ Step 12 B5   — Tighten project correlator fuzzy match (1 h)
 > Phase 4 behaviour is removed or broken. The portal continues to work fully offline (with no service
 > running) for all its current features; Phase 5 capabilities are progressive enhancements that surface
 > when the service is available and configured.
+
+Implement and **integration-test** JIRA + LLM behaviour on the **internal device** where credentials and
+network policy are valid; use the primary workstation for canvas/portal UI and point its service base URL
+at that internal host (or tunnel) for end-to-end checks. Update this document’s gap sections when items
+ship so the plan stays the single source of truth for Phase 5 scope.

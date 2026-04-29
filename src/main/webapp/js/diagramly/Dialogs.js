@@ -296,8 +296,9 @@ var StorageDialog = function(editorUi, fn, rowLimit)
  * firewall rules) are stored as the attribute "archSchemaOverrides" on the
  * current diagram page's XML node. They travel with the .drawio file and
  * survive browser restarts — BUT only after you save the file. The canonical
- * base catalog lives in schemas/architecture.schema.json and is mirrored in
- * ArchitectureSchemaEmbedded.js when the JSON cannot be fetched.
+ * base catalog lives in schemas/architecture.schema.json (see
+ * HKMAArchitectureConstants.js) and is mirrored in ArchitectureSchemaEmbedded.js
+ * when the JSON cannot be fetched (regenerate: node etc/generate-architecture-schema-embedded.js).
  * Use the "Save Diagram" button below to persist all pending changes.
  */
 function makeSaveDiagramBar(editorUi)
@@ -1617,6 +1618,15 @@ var ArchitectureCatalogDialog = function(editorUi)
 	title.style.flexShrink = '0';
 	mxUtils.write(title, 'Architecture Admin');
 	div.appendChild(title);
+
+	var sub = document.createElement('div');
+	sub.style.textAlign = 'center';
+	sub.style.fontSize = '11px';
+	sub.style.color = '#888';
+	sub.style.marginBottom = '8px';
+	sub.style.flexShrink = '0';
+	mxUtils.write(sub, 'Zones, components, categories, and styles for the architecture sidebar.');
+	div.appendChild(sub);
 	
 	var registry = window.ArchitectureSchemaRegistry;
 	var schema = (registry != null) ? (registry.getEffective() || registry.loadSync(editorUi)) : null;
@@ -1649,8 +1659,7 @@ var ArchitectureCatalogDialog = function(editorUi)
 		{value: 'zones', label: 'Zones'},
 		{value: 'components', label: 'Components'},
 		{value: 'categories', label: 'Categories'},
-		{value: 'styles', label: 'Styles'},
-		{value: 'firewallRules', label: 'Firewall Rules'}
+		{value: 'styles', label: 'Styles'}
 	];
 	
 	for (var t = 0; t < tabs.length; t++)
@@ -1673,14 +1682,7 @@ var ArchitectureCatalogDialog = function(editorUi)
 	
 	var addButton = mxUtils.button('+ Add New', function()
 	{
-		if (tabSelect.value === 'firewallRules')
-		{
-			showFwRuleEditor(null);
-		}
-		else
-		{
-			showEditor(null);
-		}
+		showEditor(null);
 	});
 	addButton.style.height = '28px';
 	toolbar.appendChild(addButton);
@@ -2235,375 +2237,6 @@ var ArchitectureCatalogDialog = function(editorUi)
 		countLabel.innerText = shown + ' of ' + keys.length + ' styles';
 	}
 	
-	// ── Firewall Rules working state ─────────────────────────────────────
-	var effectiveFwRules = (schema != null && schema.firewallRules != null) ? schema.firewallRules : {default: {}, rules: []};
-	var workingFwRules = JSON.parse(JSON.stringify(effectiveFwRules));
-	overrides.firewallRules = overrides.firewallRules || null;
-
-	var fwSelectedIndex = -1;
-	var fwSectionValue = 'rules';
-
-	function renderFirewallRules(filter)
-	{
-		tableWrap.innerHTML = '';
-		editorWrap.style.display = 'none';
-		editorWrap.innerHTML = '';
-
-		// Section selector
-		var sectionBar = document.createElement('div');
-		sectionBar.style.marginBottom = '8px';
-		sectionBar.style.display = 'flex';
-		sectionBar.style.gap = '8px';
-		sectionBar.style.alignItems = 'center';
-
-		var secLabel = document.createElement('span');
-		secLabel.style.fontWeight = '600';
-		secLabel.style.fontSize = '12px';
-		mxUtils.write(secLabel, 'Section:');
-		sectionBar.appendChild(secLabel);
-
-		var secSelect = document.createElement('select');
-		secSelect.style.height = '26px';
-		var secOpts = [
-			{value: 'rules', label: 'Rules'},
-			{value: 'default', label: 'Default Policy'}
-		];
-
-		for (var s = 0; s < secOpts.length; s++)
-		{
-			var sOpt = document.createElement('option');
-			sOpt.value = secOpts[s].value;
-			sOpt.text = secOpts[s].label;
-			secSelect.appendChild(sOpt);
-		}
-
-		secSelect.value = fwSectionValue;
-		sectionBar.appendChild(secSelect);
-		tableWrap.appendChild(sectionBar);
-
-		// Default policy editor
-		var defaultSection = document.createElement('div');
-		defaultSection.style.display = fwSectionValue === 'default' ? '' : 'none';
-		defaultSection.style.padding = '8px';
-		defaultSection.style.border = '1px solid rgba(255,255,255,0.12)';
-		defaultSection.style.borderRadius = '4px';
-		defaultSection.style.fontSize = '12px';
-
-		var defaultLabel = document.createElement('div');
-		defaultLabel.style.fontWeight = '600';
-		defaultLabel.style.marginBottom = '8px';
-		mxUtils.write(defaultLabel, 'Default fallback policy (applied when no rule matches):');
-		defaultSection.appendChild(defaultLabel);
-
-		var dflt = workingFwRules.default || {};
-
-		function makeDefaultRow(label, key, opts)
-		{
-			var row = document.createElement('div');
-			row.style.display = 'flex';
-			row.style.alignItems = 'center';
-			row.style.gap = '8px';
-			row.style.marginBottom = '6px';
-
-			var lbl = document.createElement('label');
-			lbl.style.width = '120px';
-			lbl.style.fontWeight = '500';
-			mxUtils.write(lbl, label);
-			row.appendChild(lbl);
-
-			var ctrl;
-
-			if (opts != null)
-			{
-				ctrl = document.createElement('select');
-				ctrl.style.height = '24px';
-				ctrl.style.width = '180px';
-
-				for (var i = 0; i < opts.length; i++)
-				{
-					var o = document.createElement('option');
-					o.value = opts[i];
-					o.text = opts[i];
-					ctrl.appendChild(o);
-				}
-
-				ctrl.value = dflt[key] != null ? dflt[key] : '';
-			}
-			else
-			{
-				ctrl = document.createElement('input');
-				ctrl.type = 'text';
-				ctrl.value = dflt[key] != null ? String(dflt[key]) : '';
-				ctrl.style.height = '24px';
-				ctrl.style.width = '180px';
-				ctrl.style.padding = '0 6px';
-				ctrl.style.boxSizing = 'border-box';
-			}
-
-			ctrl.dataset.key = key;
-			row.appendChild(ctrl);
-
-			return {row: row, ctrl: ctrl};
-		}
-
-		var dfltFtRow = makeDefaultRow('firewallType', 'firewallType', ['physical', 'virtual', 'none']);
-		var dfltProvRow = makeDefaultRow('provider', 'provider', ['NSX', 'PSO', 'AWS', 'none']);
-		var dfltReqRow = makeDefaultRow('required', 'required', ['true', 'false']);
-		dfltReqRow.ctrl.value = (dflt.required === false) ? 'false' : 'true';
-
-		defaultSection.appendChild(dfltFtRow.row);
-		defaultSection.appendChild(dfltProvRow.row);
-		defaultSection.appendChild(dfltReqRow.row);
-
-		var dfltSaveBtn = mxUtils.button('Save Default Policy', function()
-		{
-			// Only override the default policy — preserve any tombstones in fw.rules
-			var fw = overrides.firewallRules || {};
-			fw.default = {
-				firewallType: dfltFtRow.ctrl.value,
-				provider: dfltProvRow.ctrl.value,
-				required: dfltReqRow.ctrl.value !== 'false'
-			};
-			overrides.firewallRules = fw;
-			registry.setOverrides(editorUi, overrides);
-			schema = registry.getEffective();
-			workingFwRules = JSON.parse(JSON.stringify(schema.firewallRules || {default: {}, rules: []}));
-		});
-		dfltSaveBtn.style.marginTop = '6px';
-		dfltSaveBtn.style.padding = '4px 12px';
-		defaultSection.appendChild(dfltSaveBtn);
-		tableWrap.appendChild(defaultSection);
-
-		// Rules list table
-		var rulesSection = document.createElement('div');
-		rulesSection.style.display = fwSectionValue === 'rules' ? '' : 'none';
-
-		var table = document.createElement('table');
-		table.style.width = '100%';
-		table.style.borderCollapse = 'collapse';
-
-		var thead = document.createElement('thead');
-		var thr = document.createElement('tr');
-		var headers = ['id', 'priority', 'when', 'effect', 'enabled', 'actions'];
-
-		for (var h = 0; h < headers.length; h++)
-		{
-			thr.appendChild(makeHeader(headers[h]));
-		}
-
-		thead.appendChild(thr);
-		table.appendChild(thead);
-
-		var tbody = document.createElement('tbody');
-		var rules = workingFwRules.rules || [];
-		var shown = 0;
-
-		for (var i = 0; i < rules.length; i++)
-		{
-			(function(idx)
-			{
-				var rule = rules[idx];
-
-				if (rule == null)
-				{
-					return;
-				}
-
-				var whenStr = JSON.stringify(rule.when || {});
-				var effectStr = rule.effect ? JSON.stringify(rule.effect) : '';
-				var filterValues = [rule.id, String(rule.priority || ''), whenStr, effectStr];
-
-				if (!matchesFilter(filterValues, filter))
-				{
-					return;
-				}
-
-				var tr = document.createElement('tr');
-				tr.appendChild(makeCell(rule.id, {mono: true}));
-				tr.appendChild(makeCell(String(rule.priority != null ? rule.priority : ''), null));
-				tr.appendChild(makeCell(whenStr, {mono: true, maxWidth: 260, title: true, wrap: false}));
-				tr.appendChild(makeCell(rule.effect ? (rule.effect.firewallType || '') + ' / ' + (rule.effect.provider || '') : '', null));
-				tr.appendChild(makeCell(rule.enabled === false ? 'no' : 'yes', null));
-
-				// Actions cell
-				var actionsTd = document.createElement('td');
-				actionsTd.style.padding = '4px 8px';
-				actionsTd.style.borderBottom = '1px solid #efefef';
-				actionsTd.style.whiteSpace = 'nowrap';
-
-				var editBtn = mxUtils.button('Edit', function(capturedIdx)
-				{
-					return function()
-					{
-						fwSelectedIndex = capturedIdx;
-						showFwRuleEditor(capturedIdx);
-					};
-				}(idx));
-				editBtn.style.marginRight = '4px';
-				editBtn.style.padding = '2px 8px';
-				actionsTd.appendChild(editBtn);
-
-				var delBtn = mxUtils.button('Delete', function(capturedId, capturedFilter)
-				{
-					return function()
-					{
-						editorUi.confirm(
-							'Delete firewall rule "' + capturedId + '"?',
-							function()
-							{
-								// Use _delete tombstone so mergeById removes it from base rules too
-								var fw = overrides.firewallRules || {};
-								var ovRules = Array.isArray(fw.rules) ? fw.rules.slice() : [];
-								ovRules = ovRules.filter(function(r) { return r.id !== capturedId; });
-								ovRules.push({id: capturedId, _delete: true});
-								fw.rules = ovRules;
-								overrides.firewallRules = fw;
-								registry.setOverrides(editorUi, overrides);
-								schema = registry.getEffective();
-								workingFwRules = JSON.parse(JSON.stringify(schema.firewallRules || {default: {}, rules: []}));
-								fwSelectedIndex = -1;
-								renderFirewallRules(capturedFilter);
-							}
-						);
-					};
-				}(rules[idx].id, filter));
-				delBtn.style.padding = '2px 8px';
-				actionsTd.appendChild(delBtn);
-
-				tr.appendChild(actionsTd);
-				tbody.appendChild(tr);
-				shown++;
-			})(i);
-		}
-
-		if (shown === 0)
-		{
-			var empty = document.createElement('tr');
-			var emptytd = document.createElement('td');
-			emptytd.colSpan = 6;
-			emptytd.style.padding = '12px 8px';
-			emptytd.style.color = '#888';
-			emptytd.style.textAlign = 'center';
-			mxUtils.write(emptytd, rules.length === 0 ? 'No firewall rules defined.' : 'No rules match the filter.');
-			empty.appendChild(emptytd);
-			tbody.appendChild(empty);
-		}
-
-		table.appendChild(tbody);
-		rulesSection.appendChild(table);
-		tableWrap.appendChild(rulesSection);
-
-		countLabel.innerText = shown + ' of ' + rules.length + ' rules';
-
-		mxEvent.addListener(secSelect, 'change', function()
-		{
-			fwSectionValue = secSelect.value;
-			renderFirewallRules((searchInput.value || '').trim());
-		});
-	}
-
-	function showFwRuleEditor(idx)
-	{
-		var rules = workingFwRules.rules || [];
-		var isNew = (idx == null);
-		var rule = isNew ? {
-			id: 'fw-rule-' + new Date().getTime(),
-			priority: 50,
-			enabled: true,
-			when: {},
-			effect: {required: true, firewallType: 'physical', provider: 'NSX', reason: ''}
-		} : JSON.parse(JSON.stringify(rules[idx]));
-
-		editorWrap.innerHTML = '';
-		editorWrap.style.display = '';
-
-		var hdr = document.createElement('div');
-		hdr.style.fontWeight = '600';
-		hdr.style.marginBottom = '8px';
-		mxUtils.write(hdr, isNew ? 'Add Firewall Rule' : 'Edit: ' + rule.id);
-		editorWrap.appendChild(hdr);
-
-		// JSON editor
-		var jsonLabel = document.createElement('div');
-		jsonLabel.style.fontSize = '11px';
-		jsonLabel.style.marginBottom = '4px';
-		mxUtils.write(jsonLabel, 'Rule JSON (edit directly):');
-		editorWrap.appendChild(jsonLabel);
-
-		var jsonTa = document.createElement('textarea');
-		jsonTa.value = JSON.stringify(rule, null, 2);
-		jsonTa.style.width = '100%';
-		jsonTa.style.height = '200px';
-		jsonTa.style.fontFamily = 'monospace';
-		jsonTa.style.fontSize = '11px';
-		jsonTa.style.resize = 'vertical';
-		jsonTa.style.boxSizing = 'border-box';
-		jsonTa.style.padding = '6px';
-		jsonTa.style.border = '1px solid rgba(255,255,255,0.2)';
-		jsonTa.style.background = 'transparent';
-		jsonTa.style.color = 'inherit';
-		editorWrap.appendChild(jsonTa);
-
-		var btns = document.createElement('div');
-		btns.style.display = 'flex';
-		btns.style.gap = '8px';
-		btns.style.marginTop = '8px';
-		btns.style.justifyContent = 'flex-end';
-
-		var cancelBtn = mxUtils.button('Cancel', function()
-		{
-			editorWrap.style.display = 'none';
-			editorWrap.innerHTML = '';
-		});
-		btns.appendChild(cancelBtn);
-
-		var saveBtn = mxUtils.button('Save Rule', function()
-		{
-			var parsed;
-
-			try
-			{
-				parsed = JSON.parse(jsonTa.value);
-			}
-			catch (e)
-			{
-				editorUi.showError(mxResources.get('error'), 'Invalid JSON: ' + e.message, mxResources.get('ok'));
-				return;
-			}
-
-			if (!parsed.id)
-			{
-				editorUi.showError(mxResources.get('error'), 'Rule must have an id.', mxResources.get('ok'));
-				return;
-			}
-
-			// Only touch the override layer — never copy the effective rules back
-			// as overrides, which would wipe tombstones for deleted base rules.
-			var fw = overrides.firewallRules || {};
-			var ovRules = Array.isArray(fw.rules) ? fw.rules.slice() : [];
-			var oldId = isNew ? null : (workingFwRules.rules && workingFwRules.rules[idx] ? workingFwRules.rules[idx].id : null);
-
-			// Remove any existing override entry for this id (and old id if renamed)
-			ovRules = ovRules.filter(function(r)
-			{
-				return r.id !== parsed.id && (oldId == null || r.id !== oldId);
-			});
-
-			ovRules.push(parsed);
-			fw.rules = ovRules;
-			overrides.firewallRules = fw;
-			registry.setOverrides(editorUi, overrides);
-			schema = registry.getEffective();
-			workingFwRules = JSON.parse(JSON.stringify(schema.firewallRules || {default: {}, rules: []}));
-			fwSelectedIndex = -1;
-			editorWrap.style.display = 'none';
-			editorWrap.innerHTML = '';
-			renderFirewallRules((searchInput.value || '').trim());
-		});
-		saveBtn.style.fontWeight = '600';
-		btns.appendChild(saveBtn);
-		editorWrap.appendChild(btns);
-	}
 
 	function showEditor(entry)
 	{
@@ -2826,10 +2459,6 @@ var ArchitectureCatalogDialog = function(editorUi)
 		{
 			renderCategories(filter);
 		}
-		else if (tabSelect.value === 'firewallRules')
-		{
-			renderFirewallRules(filter);
-		}
 		else
 		{
 			renderStyles(filter);
@@ -2840,8 +2469,6 @@ var ArchitectureCatalogDialog = function(editorUi)
 	{
 		editorWrap.style.display = 'none';
 		editorWrap.innerHTML = '';
-		fwSelectedIndex = -1;
-		fwSectionValue = 'rules';
 		renderCurrentTab();
 	});
 	mxEvent.addListener(searchInput, 'input', renderCurrentTab);

@@ -1,8 +1,10 @@
 /**
- * Auto-generated from schemas/architecture.schema.json.
+ * Auto-generated from schemas/architecture.schema.json (canonical base,
+ * including firewallRules + rules). Do not edit by hand.
  * Bundled so Architecture / Zones and Components work when the JSON file
  * cannot be fetched (wrong base URL, file://, or missing static route).
  * Regenerate: node etc/generate-architecture-schema-embedded.js
+ * Storage keys: js/diagramly/architecture/HKMAArchitectureConstants.js
  */
 (function()
 {
@@ -456,8 +458,8 @@
         "when": { "sameParent": true },
         "effect": {
           "required": false,
-          "firewallType": "none",
-          "provider": "none",
+          "firewallType": "virtual",
+          "provider": "NSX",
           "reason": "Intra-host / same parent container; no firewall required."
         }
       },

@@ -1,5 +1,10 @@
 /**
  * Architecture schema registry and override merge utilities.
+ *
+ * Firewall + validation rule bases: schemas/architecture.schema.json only
+ * (see HKMAArchitectureConstants.js). Embedded copy is generated — do not edit
+ * ArchitectureSchemaEmbedded.js by hand. Org-wide deltas use the localStorage
+ * key defined in HKMAArchitectureConstants.js (GLOBAL_OVERRIDES_LS_KEY).
  */
 (function()
 {
@@ -8,8 +13,11 @@
 		return;
 	}
 
-	var DEFAULT_SCHEMA_URL = 'schemas/architecture.schema.json';
-	var PAGE_OVERRIDE_ATTR = 'archSchemaOverrides';
+	var HK = (typeof window !== 'undefined' && window.HKMAArchitectureConstants) || {};
+	var DEFAULT_SCHEMA_URL = HK.DEFAULT_SCHEMA_RELATIVE_URL || 'schemas/architecture.schema.json';
+	var PAGE_OVERRIDE_ATTR = HK.PAGE_OVERRIDE_ATTR || 'archSchemaOverrides';
+	/** Organisation-wide overrides from Firewall Rules Panel (localStorage). Merged before per-page overrides. */
+	var GLOBAL_OVERRIDES_LS_KEY = HK.GLOBAL_OVERRIDES_LS_KEY || 'hkma.architecture.globalOverrides';
 	var CACHE_BUST = (urlParams['dev'] == '1') ? ('?_=' + new Date().getTime()) : '';
 	var _baseSchema = null;
 	var _effectiveSchema = null;
@@ -254,6 +262,50 @@
 		return null;
 	}
 
+	function readGlobalOverridesFromStorage()
+	{
+		try
+		{
+			if (typeof localStorage === 'undefined')
+			{
+				return null;
+			}
+
+			return parseOverrides(localStorage.getItem(GLOBAL_OVERRIDES_LS_KEY));
+		}
+		catch (e)
+		{
+			return null;
+		}
+	}
+
+	/**
+	 * Layer: base schema <- global org overrides (Firewall Rules Panel) <- per-page diagram overrides.
+	 * Page wins on same rule id / firewall rule id.
+	 */
+	function mergeGlobalWithPageOverrides(pageOverrides)
+	{
+		var globalO = readGlobalOverridesFromStorage();
+		pageOverrides = pageOverrides || {};
+
+		if (globalO == null)
+		{
+			return pageOverrides;
+		}
+
+		return {
+			policies: mergeObjects(globalO.policies || {}, pageOverrides.policies || {}),
+			zones: mergeById(globalO.zones || [], pageOverrides.zones || []),
+			componentCategories: mergeById(globalO.componentCategories || [], pageOverrides.componentCategories || []),
+			components: mergeById(globalO.components || [], pageOverrides.components || []),
+			styles: mergeStyles(globalO.styles || {}, pageOverrides.styles || {}),
+			rules: mergeRules(globalO.rules || {edgeRules: [], containmentRules: []},
+				pageOverrides.rules || {edgeRules: [], containmentRules: []}),
+			firewallRules: mergeFirewallRules(globalO.firewallRules || {default: {}, rules: []},
+				pageOverrides.firewallRules || {default: {}, rules: []})
+		};
+	}
+
 	function loadBaseSchema(callback)
 	{
 		if (_baseSchema != null)
@@ -320,9 +372,10 @@
 			loadBaseSchema(function(baseSchema)
 			{
 				var page = currentPage(ui);
-				var overrides = (page != null && page.node != null) ?
+				var pageOverrides = (page != null && page.node != null) ?
 					parseOverrides(page.node.getAttribute(PAGE_OVERRIDE_ATTR)) : null;
-				_effectiveSchema = buildEffectiveSchema(baseSchema, overrides);
+				var merged = mergeGlobalWithPageOverrides(pageOverrides);
+				_effectiveSchema = buildEffectiveSchema(baseSchema, merged);
 
 				if (typeof done === 'function')
 				{
@@ -340,9 +393,10 @@
 		{
 			var baseSchema = loadBaseSchemaSync();
 			var page = currentPage(ui);
-			var overrides = (page != null && page.node != null) ?
+			var pageOverrides = (page != null && page.node != null) ?
 				parseOverrides(page.node.getAttribute(PAGE_OVERRIDE_ATTR)) : null;
-			_effectiveSchema = buildEffectiveSchema(baseSchema, overrides);
+			var merged = mergeGlobalWithPageOverrides(pageOverrides);
+			_effectiveSchema = buildEffectiveSchema(baseSchema, merged);
 
 			return this.getEffective();
 		},
@@ -421,8 +475,9 @@
 
 		refreshEffective: function(ui)
 		{
-			var overrides = this.getOverrides(ui);
-			_effectiveSchema = buildEffectiveSchema(_baseSchema, overrides);
+			var pageOverrides = this.getOverrides(ui);
+			var merged = mergeGlobalWithPageOverrides(pageOverrides);
+			_effectiveSchema = buildEffectiveSchema(_baseSchema, merged);
 
 			return this.getEffective();
 		},

@@ -147,6 +147,41 @@ App = function(editor, container, lightbox)
 		}), 5000); //5 sec timeout
 	}
 
+	// HKMA: refresh architecture schema when Firewall Rules Panel saves org-wide overrides.
+	if (!window.__hkmaGlobalSchemaSyncInstalled)
+	{
+		window.__hkmaGlobalSchemaSyncInstalled = true;
+
+		var __hkmaConst = (typeof window !== 'undefined' && window.HKMAArchitectureConstants) || {};
+		var __hkmaBcName = __hkmaConst.BROADCAST_CHANNEL_NAME || 'hkma-architecture-global';
+		var __hkmaLsKey = __hkmaConst.GLOBAL_OVERRIDES_LS_KEY || 'hkma.architecture.globalOverrides';
+
+		if (typeof BroadcastChannel !== 'undefined')
+		{
+			try
+			{
+				var __hkmaSchemaCh = new BroadcastChannel(__hkmaBcName);
+				__hkmaSchemaCh.addEventListener('message', mxUtils.bind(this, function()
+				{
+					if (this.refreshArchitectureSchema != null)
+					{
+						this.refreshArchitectureSchema();
+					}
+				}));
+			}
+			catch (e) { /* ignore */ }
+		}
+
+		window.addEventListener('storage', mxUtils.bind(this, function(ev)
+		{
+			if (ev != null && ev.key === __hkmaLsKey &&
+				this.refreshArchitectureSchema != null)
+			{
+				this.refreshArchitectureSchema();
+			}
+		}));
+	}
+
 	this.load();
 };
 
