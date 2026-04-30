@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>New review — Reviewer workspace | HKMA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles/hkma-app-nav.css">
+  <link rel="stylesheet" href="styles/reviewer-workspace.css">
+  <script src="js/hkma-demo-mode.js"></script>
+  <script>
+    document.documentElement.classList.toggle(
+      'hkma-demo-mode',
+      typeof HKMA_getDemoMode === 'function' && HKMA_getDemoMode()
+    );
+  </script>
+</head>
+<body data-reviewer-page="review">
+
+<nav class="hkma-menubar-strip" aria-label="HKMA navigation">
+  <div class="hkma-menubar-strip-inner">
+    <a class="hkma-ge-item" href="index.html" target="_blank" rel="noopener">Canvas</a>
+    <a class="hkma-ge-item" href="firewall-rules-panel.html" target="_blank" rel="noopener">Firewall Rules Panel</a>
+    <a class="hkma-ge-item" href="projects.html">Projects Portal</a>
+    <a class="hkma-ge-item hkma-ge-item--active" href="llm-analysis.html">Reviewer workspace</a>
+  </div>
+</nav>
+
+<div class="page-wrap">
+  <div class="demo-mode-banner" role="status">
+    <strong>Client demo mode</strong> — simulated API on hosted URLs. <code>localhost</code>: real service by default. <a href="llm-analysis.html">Overview</a> explains toggles.
+  </div>
+
+  <div class="sticky-subnav">
+    <div class="sticky-subnav-inner">
+      <a class="subnav-link" href="llm-analysis.html">Overview</a>
+      <a class="subnav-link" href="llm-analysis-review.html" aria-current="page">New review</a>
+      <a class="subnav-link" href="llm-analysis-history.html">Analysed requests</a>
+      <a class="subnav-link" href="llm-analysis-chat.html">Assistant chat</a>
+    </div>
+  </div>
+
+  <header class="hero">
+    <h1>New review</h1>
+    <span class="badge">Firewall validity</span>
+    <span class="badge badge-demo">Client demo</span>
+    <p>
+      Find the Jira ticket, optionally tie it to a portal project and ARB links, sync data if needed, then run the analysis.
+      After a successful run you are taken to <strong>Analysed requests</strong>.
+    </p>
+  </header>
+
+  <div class="card" style="margin-top: 8px;">
+    <div class="field-label">Analysis service connectivity</div>
+    <p class="hint" id="analysisConnectivityHint" style="margin-bottom: 10px;">The Node service on <code>http://localhost:3001</code> must reach Jira and your LLM. Use this before reviews if something fails.</p>
+    <button type="button" class="btn btn-secondary" id="probeBtn">Test Jira and LLM</button>
+    <pre class="code" id="probeResult" style="margin-top: 12px; display: none; white-space: pre-wrap;"></pre>
+  </div>
+
+  <section id="workflow" aria-labelledby="workflow-title">
+    <h2 class="section-title" id="workflow-title"><span class="num">1</span> Analyse a firewall request</h2>
+
+    <div class="card">
+      <div class="field-label">Find the Jira ticket</div>
+      <div class="row-2">
+        <div class="field" style="margin-bottom: 0;">
+          <input type="text" id="jiraSearchInput" placeholder="Search summary or paste key (e.g. FWREQ-101)" autocomplete="off" />
+        </div>
+        <div class="field" style="margin-bottom: 0; display: flex; align-items: flex-end;">
+          <button type="button" class="btn btn-secondary" id="jiraSearchBtn" style="width: 100%;">Search Jira</button>
+        </div>
+      </div>
+      <div class="search-results" id="searchResults" role="listbox" aria-label="Search results"></div>
+      <div class="field" style="margin-top: 16px;">
+        <div class="field-label">Or enter issue key</div>
+        <div class="row-2">
+          <input type="text" id="issueKeyInput" placeholder="FWREQ-101" />
+          <div style="display: flex; align-items: flex-end;">
+            <button type="button" class="btn btn-secondary" id="loadIssueBtn" style="width: 100%;">Load ticket</button>
+          </div>
+        </div>
+      </div>
+      <div class="preview-box" id="issuePreview" aria-live="polite"></div>
+    </div>
+
+    <div class="card">
+      <div class="field-label">Context (optional)</div>
+      <div class="field">
+        <div class="field-label" style="text-transform: none; color: var(--text); font-weight: 500;">Portal project override</div>
+        <select id="projectSelect">
+          <option value="">Auto-match from Jira (uses server snapshot)</option>
+        </select>
+        <p class="hint">If the server snapshot is stale, use <strong>Sync portal data</strong> below after BTG updates the Projects Portal in <em>this browser</em>.</p>
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <div class="field-label" style="text-transform: none;">ARB ticket key</div>
+          <input type="text" id="arbKeyInput" placeholder="e.g. ARB-2024-031" />
+        </div>
+        <div class="field">
+          <div class="field-label" style="text-transform: none;">ARB or doc URL (optional)</div>
+          <input type="url" id="arbUrlInput" placeholder="https://jira…/browse/ARB-…" />
+        </div>
+      </div>
+      <div class="row-2">
+        <div class="field">
+          <div class="field-label" style="text-transform: none;">Extra link label</div>
+          <input type="text" id="extraLabelInput" placeholder="e.g. Confluence design page" />
+        </div>
+        <div class="field">
+          <div class="field-label" style="text-transform: none;">Extra link URL</div>
+          <input type="url" id="extraUrlInput" placeholder="https://…" />
+        </div>
+      </div>
+      <div class="field">
+        <div class="field-label" style="text-transform: none;">Reviewer notes</div>
+        <textarea id="reviewerNotesInput" placeholder="What you verified manually in Jira (for your own audit trail)."></textarea>
+      </div>
+
+      <div class="btn-row">
+        <button type="button" class="btn btn-primary" id="runReviewBtn">Run validity analysis</button>
+        <button type="button" class="btn btn-secondary" id="syncPortalBtn">Sync portal data</button>
+      </div>
+      <p class="hint">Sync pushes the project list and diagram files from the Projects Portal (local storage) to the analysis service so matching and LLM context stay current.</p>
+    </div>
+
+    <div class="verdict-panel" id="verdictPanel">
+      <div class="verdict-top">
+        <div class="score-wrap">
+          <div class="score-ring" id="scoreRing" style="--pct: 0; --c: var(--accent);"><span id="scoreLabel">—</span></div>
+        </div>
+        <div>
+          <div id="verdictKey" style="font-size: 1.1rem; font-weight: 700;"></div>
+          <div style="margin-top: 8px;"><span class="outcome-badge" id="outcomeBadge"></span></div>
+          <p class="hint" id="verdictHint" style="margin-top: 10px;"></p>
+        </div>
+      </div>
+      <div class="field-label" style="margin-top: 18px;">Reasoning</div>
+      <ul class="reasoning-list" id="reasoningList"></ul>
+      <div class="field-label" style="margin-top: 16px;">Full analysis</div>
+      <div class="analysis-body" id="analysisBody"></div>
+      <div class="field-label" style="margin-top: 16px;">Source documents</div>
+      <div class="doc-list" id="verdictDocs"></div>
+    </div>
+  </section>
+</div>
+
+<div class="toast-container" id="toastContainer" aria-live="polite"></div>
+
+<script src="js/diagramly/architecture/ProjectStore.js"></script>
+<script src="js/reviewer-workspace.js"></script>
+</body>
+</html>

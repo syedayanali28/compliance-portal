@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reviewer workspace — Overview | HKMA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles/hkma-app-nav.css">
+  <link rel="stylesheet" href="styles/reviewer-workspace.css">
+  <script src="js/hkma-demo-mode.js"></script>
+  <script>
+    document.documentElement.classList.toggle(
+      'hkma-demo-mode',
+      typeof HKMA_getDemoMode === 'function' && HKMA_getDemoMode()
+    );
+  </script>
+</head>
+<body data-reviewer-page="hub">
+
+<nav class="hkma-menubar-strip" aria-label="HKMA navigation">
+  <div class="hkma-menubar-strip-inner">
+    <a class="hkma-ge-item" href="index.html" target="_blank" rel="noopener">Canvas</a>
+    <a class="hkma-ge-item" href="firewall-rules-panel.html" target="_blank" rel="noopener">Firewall Rules Panel</a>
+    <a class="hkma-ge-item" href="projects.html">Projects Portal</a>
+    <a class="hkma-ge-item hkma-ge-item--active" href="llm-analysis.html" aria-current="page">Reviewer workspace</a>
+  </div>
+</nav>
+
+<div class="page-wrap">
+  <div class="demo-mode-banner" role="status">
+    <strong>Client demo mode</strong> — Jira search, analysis, chat, and health probes are simulated in the browser on hosted URLs. <code>http://localhost</code> defaults to the real API on port 3001. Toggle with <code>?demo=0</code> / <code>?demo=1</code> or <code>localStorage.hkmaDemoMode</code>.
+  </div>
+
+  <div class="sticky-subnav">
+    <div class="sticky-subnav-inner">
+      <a class="subnav-link" href="llm-analysis.html" aria-current="page">Overview</a>
+      <a class="subnav-link" href="llm-analysis-review.html">New review</a>
+      <a class="subnav-link" href="llm-analysis-history.html">Analysed requests</a>
+      <a class="subnav-link" href="llm-analysis-chat.html">Assistant chat</a>
+    </div>
+  </div>
+
+  <header class="hero">
+    <h1>Reviewer workspace</h1>
+    <span class="badge">Firewall validity</span>
+    <span class="badge badge-demo">Client demo</span>
+    <p>
+      Each task has its own page so the relevant controls stay in view — no in-page jumping.
+      BTG admins maintain projects in the Projects Portal; you search Jira, run analysis, and track outcomes here.
+    </p>
+  </header>
+
+  <div class="hub-grid">
+    <a class="hub-card" href="llm-analysis-review.html">
+      <h2>New review</h2>
+      <p>Search or load a firewall Jira ticket, add optional portal and ARB context, sync portal data, run <strong>Run validity analysis</strong>, and read the verdict.</p>
+    </a>
+    <a class="hub-card" href="llm-analysis-history.html">
+      <h2>Analysed requests</h2>
+      <p>Browse completed reviews, expand rows for reasoning and sources. Re-running the same Jira key updates the stored entry.</p>
+    </a>
+    <a class="hub-card" href="llm-analysis-chat.html">
+      <h2>Assistant chat</h2>
+      <p>Optional follow-up questions to the analysis service LLM. Does not replace the structured review workflow.</p>
+    </a>
+  </div>
+</div>
+
+<script src="js/reviewer-workspace.js"></script>
+</body>
+</html>

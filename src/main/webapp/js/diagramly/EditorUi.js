@@ -15202,7 +15202,7 @@
 	};
 
 	/**
-	 * HKMA: "Firewall Rules Panel" and "Projects Portal" on the classic menubar row.
+	 * HKMA: "Firewall Rules Panel", "Projects Portal", and "LLM Analysis" on the classic menubar row.
 	 */
 	EditorUi.prototype.ensureProjectsPortalMenubarLink = function()
 	{
@@ -15224,6 +15224,13 @@
 		if (prev != null)
 		{
 			prev.parentNode.removeChild(prev);
+		}
+
+		var prevLlm = c.querySelector('[data-hkma-llm-analysis="1"]');
+
+		if (prevLlm != null)
+		{
+			prevLlm.parentNode.removeChild(prevLlm);
 		}
 
 		var btnFw = document.createElement('a');
@@ -15256,17 +15263,34 @@
 			mxEvent.consume(evt);
 		});
 
+		var btnLlm = document.createElement('a');
+		btnLlm.setAttribute('data-hkma-llm-analysis', '1');
+		btnLlm.className = 'geItem';
+		btnLlm.setAttribute('href', 'javascript:void(0);');
+		btnLlm.style.cursor = 'pointer';
+		btnLlm.style.flexShrink = '0';
+		btnLlm.style.whiteSpace = 'nowrap';
+		mxUtils.write(btnLlm, 'Reviewer');
+
+		mxEvent.addListener(btnLlm, 'click', function(evt)
+		{
+			window.open('llm-analysis.html', '_blank');
+			mxEvent.consume(evt);
+		});
+
 		var sc = this.statusContainer;
 
 		if (sc != null && sc.parentNode === c)
 		{
 			c.insertBefore(btnFw, sc);
 			c.insertBefore(btn, sc);
+			c.insertBefore(btnLlm, sc);
 		}
 		else
 		{
 			c.appendChild(btnFw);
 			c.appendChild(btn);
+			c.appendChild(btnLlm);
 		}
 	};
 

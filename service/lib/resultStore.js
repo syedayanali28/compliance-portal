@@ -5,6 +5,8 @@ const path = require('path');
 
 const RESULTS_FILE    = path.join(__dirname, '../data/analysis-results.json');
 const PROJECTS_FILE   = path.join(__dirname, '../data/projects-snapshot.json');
+/** Rich artefacts (e.g. diagram XML) pushed from the portal for LLM tools — kept separate from the lightweight snapshot. */
+const PROJECT_ARTEFACTS_FILE = path.join(__dirname, '../data/project-artefacts.json');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -92,6 +94,69 @@ function writeProjectsSnapshot(projects) {
   console.log(`[resultStore] Projects snapshot updated (${projects.length} projects)`);
 }
 
+// ── Project artefacts (diagrams for LLM, etc.) ─────────────────────────────
+
+/**
+ * @returns {Record<string, { diagramXml?: string, diagramFilename?: string }>}
+ */
+function readProjectArtefacts() {
+  return readJson(PROJECT_ARTEFACTS_FILE, {});
+}
+
+/**
+ * Merge diagram (and future) artefacts keyed by project id.
+ * @param {Array<{ id: string, diagramXml?: string|null, diagramFilename?: string|null }>} items
+ */
+function mergeProjectArtefacts(items) {
+  const existing = readProjectArtefacts();
+  const next = { ...existing };
+  for (const item of items || []) {
+    if (!item || !item.id) continue;
+    const prev = next[item.id] || {};
+    next[item.id] = {
+      ...prev,
+      diagramXml:
+        item.diagramXml === undefined ? prev.diagramXml : item.diagramXml || undefined,
+      diagramFilename:
+        item.diagramFilename === undefined
+          ? prev.diagramFilename
+          : item.diagramFilename || undefined,
+    };
+    if (!next[item.id].diagramXml) {
+      delete next[item.id].diagramXml;
+      delete next[item.id].diagramFilename;
+    }
+    if (Object.keys(next[item.id]).length === 0) delete next[item.id];
+  }
+  writeJson(PROJECT_ARTEFACTS_FILE, next);
+  console.log(`[resultStore] Project artefacts updated (${Object.keys(next).length} projects with artefacts)`);
+  return next;
+}
+
+/**
+ * @param {string|null} projectId
+ * @param {string} [projectCodeHint]  used only to find id from snapshot when id is missing
+ * @returns {{ diagramXml?: string, diagramFilename?: string }|null}
+ */
+function getDiagramArtefact(projectId, projectCodeHint) {
+  const all = readProjectArtefacts();
+  let id = projectId;
+  if (!id && projectCodeHint) {
+    const code = String(projectCodeHint).trim().toLowerCase();
+    const projects = readProjectsSnapshot();
+    const p = projects.find(
+      (x) =>
+        String(x.code || '')
+          .trim()
+          .toLowerCase() === code
+    );
+    if (p) id = p.id;
+  }
+  if (!id) return null;
+  const a = all[id];
+  return a && a.diagramXml ? a : null;
+}
+
 module.exports = {
   readResults,
   writeResults,
@@ -99,4 +164,7 @@ module.exports = {
   getResultByJiraKey,
   readProjectsSnapshot,
   writeProjectsSnapshot,
+  readProjectArtefacts,
+  mergeProjectArtefacts,
+  getDiagramArtefact,
 };

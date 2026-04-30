@@ -17,7 +17,7 @@
 **Integration contract between machines**
 
 1. **Portal → service URL** — `projects.html` resolves the analysis service (e.g. `getServiceUrl()` or equivalent). On the workstation, point that base URL at the internal device’s reachable address (e.g. `https://analysis-internal.hkma.local:3001` or SSH tunnel). If the URL is wrong, the portal still works offline; JIRA search and ARB updates simply degrade (Part H).
-2. **CORS** — If the portal is opened from a different origin than the service (e.g. file://, `localhost`, or Vercel), ensure `service/server.js` allows the portal origin in CORS for `GET/POST` on `/api/*` (add only hosts you trust).
+2. **CORS** — If the portal is opened from a different origin than the service (for example `file://`, `localhost`, or a hosted static site), ensure `service/server.js` allows the portal origin in CORS for `GET/POST` on `/api/*` (add only hosts you trust).
 3. **Repo sync** — Track Phase 5 code in `dev` (or your release branch) and pull on the internal device before testing; or push from the internal device back to GitHub so CI and the workstation stay aligned.
 
 **Keeping this plan up to date** — When you finish a gap (B1–B7, C*, D*), tick it in your tracker and optionally add a one-line “Done — commit `abc1234`” note under that subsection so the next reader sees reality vs plan.

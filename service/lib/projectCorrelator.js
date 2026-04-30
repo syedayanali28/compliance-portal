@@ -2,14 +2,16 @@
 
 const { readProjectsSnapshot } = require('./resultStore');
 const { getFirewallRows } = require('./firewallRowsFromProject');
+const stringSimilarity = require('string-similarity');
 
 /**
  * Attempt to match a JIRA issue to a project in the portal snapshot.
  *
  * Matching strategy (in order):
  *  1. issue.fields.project.key === project.code  (exact, case-insensitive)
- *  2. issue.fields.project.name.toLowerCase() includes project.name.toLowerCase() (fuzzy)
- *  3. Return null (unmatched — still analysed, just without diagram context)
+ *  2. issue.fields.project.name and project.name string similarity (score > 0.8)
+ *  3. issue.key prefix (JIRA project key) is a substring of project.code
+ *  4. Return null (unmatched — still analysed, just without diagram context)
  *
  * @param {object} issue  A JIRA issue object
  * @param {Array}  [projects]  Optional pre-loaded snapshot; reads from disk if omitted
@@ -21,6 +23,7 @@ function matchIssueToProject(issue, projects) {
 
   const jiraProjectKey  = ((issue.fields.project && issue.fields.project.key)  || '').toUpperCase();
   const jiraProjectName = ((issue.fields.project && issue.fields.project.name) || '').toLowerCase();
+  const issueKeyPrefix = issue.key ? issue.key.split('-')[0].toUpperCase() : '';
 
   // 1. Exact key match
   for (const p of snapshot) {
@@ -30,12 +33,25 @@ function matchIssueToProject(issue, projects) {
     }
   }
 
-  // 2. Fuzzy name match
-  for (const p of snapshot) {
-    if (p.name && jiraProjectName.includes(p.name.toLowerCase())) {
-      console.log(`[correlator] Fuzzy name match: issue ${issue.key} → project "${p.name}" (${p.id})`);
-      return p;
-    }
+  // 2. Fuzzy name match (string similarity score > 0.8)
+  if (jiraProjectName) {
+      const projectNames = snapshot.map(p => p.name.toLowerCase());
+      const bestMatch = stringSimilarity.findBestMatch(jiraProjectName, projectNames);
+      if (bestMatch.bestMatch.rating > 0.8) {
+          const matchedProject = snapshot[bestMatch.bestMatchIndex];
+          console.log(`[correlator] Fuzzy name match (score: ${bestMatch.bestMatch.rating.toFixed(2)}): issue ${issue.key} → project "${matchedProject.name}" (${matchedProject.id})`);
+          return matchedProject;
+      }
+  }
+
+  // 3. Issue key prefix is substring of project code
+  if (issueKeyPrefix) {
+      for (const p of snapshot) {
+          if (p.code && p.code.toUpperCase().includes(issueKeyPrefix)) {
+               console.log(`[correlator] Prefix substring match: issue ${issue.key} → project "${p.name}" (${p.id}) [prefix: ${issueKeyPrefix}, code: ${p.code}]`);
+               return p;
+          }
+      }
   }
 
   console.log(`[correlator] No match for issue ${issue.key} (JIRA project: ${jiraProjectKey || jiraProjectName})`);

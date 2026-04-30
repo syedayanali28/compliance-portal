@@ -6,6 +6,7 @@ const router  = express.Router();
 const {
   readProjectsSnapshot,
   writeProjectsSnapshot,
+  mergeProjectArtefacts,
 } = require('../lib/resultStore');
 
 // GET /api/projects — return current projects snapshot
@@ -27,6 +28,21 @@ router.post('/projects/sync', (req, res) => {
     }
     writeProjectsSnapshot(projects);
     res.json({ ok: true, count: projects.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/projects/artefacts — merge diagram XML and other heavy artefacts for LLM tools (from portal export)
+router.post('/projects/artefacts', (req, res) => {
+  try {
+    const raw = req.body;
+    const items = Array.isArray(raw) ? raw : raw && raw.artefacts;
+    if (!Array.isArray(items)) {
+      return res.status(400).json({ error: 'Expected { artefacts: [...] } or a raw array' });
+    }
+    const merged = mergeProjectArtefacts(items);
+    res.json({ ok: true, projectCount: Object.keys(merged).length });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

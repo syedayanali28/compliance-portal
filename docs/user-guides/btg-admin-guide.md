@@ -1,188 +1,192 @@
-# BTG Admin Guide — Projects Portal
+# BTG Admin Guide: Projects Portal
 
-> **Audience:** BTG admins who consolidate architecture diagrams and IdaC firewall workbooks across teams, link them to portal records, drive **live JIRA** correlation, run **LLM firewall analysis**, and keep **ARB** tickets in sync with linked artefacts.  
-> **Assumption (April 2026):** The analysis service on your **internal device** is fully configured with JIRA and LLM credentials (no stub mode in production). The portal talks to that service over HTTPS (or a tunnel) as described below.
+**Audience:** BTG administrator who collect architecture diagrams and IdaC firewall workbooks from delivery teams, link them to portal records, align JIRA firewall work with projects, run LLM-assisted analysis, and keep ARB tickets consistent with linked artefacts.
 
-## 1. What you can do as a BTG admin
+**Environment:** The Node analysis service runs on an internal host that can reach your JIRA and LLM endpoints. The portal calls that service over HTTPS, including where access is provided through a tunnel. Production should use valid JIRA and LLM configuration on that host.
 
-| Capability | Where |
+## 1. Capabilities
+
+| Capability | Location |
 |---|---|
-| Create / edit / archive projects | Projects Portal — main grid |
-| **Search and pick a JIRA project** to fill **Project Code** (live) | New / Edit Project modal — **Search JIRA projects** |
-| **Search and link an ARB JIRA ticket** to the project | New / Edit Project modal — **Search ARB tickets** |
-| Assign team and people to a project | Project edit modal |
-| Link a `.drawio` architecture diagram | Per-card **Link Diagram** |
-| Link an **IdaC `.xlsx`** workbook (from **File → Export firewall (IdaC template)** on the canvas) | Per-card **Link IdaC workbook** |
-| **Auto-update the linked ARB ticket in JIRA** when diagram or IdaC changes | After each successful link (non-blocking toast) |
-| Open a linked diagram in the canvas | Per-card **Open in Canvas** |
-| Inspect linked IdaC (download / open) | Per-card workbook strip |
-| Trigger **JIRA poll + LLM** firewall analysis | Header **Run Analysis** |
-| Push the projects snapshot to the analysis service | Header **Export Snapshot** |
-| **See service health** (poll schedule, last run, LLM mode) | Header **status pill** (`GET /api/status`) |
-| Review per-project LLM analysis results | Card **Analysis** panel |
+| Create, edit, or archive projects | Projects Portal grid |
+| Search JIRA projects to set **Project Code** | New or Edit Project modal |
+| Search and attach an **ARB** JIRA ticket | New or Edit Project modal |
+| Assign team and people | Edit Project modal |
+| Link a `.drawio` diagram | Card action **Link Diagram** |
+| Link an IdaC `.xlsx` workbook exported from the canvas | Card action **Link IdaC workbook** |
+| Refresh the linked **ARB** description in JIRA after links change | Automatic after each successful link, with toast feedback |
+| Open a linked diagram in the editor | Card action **Open in Canvas** |
+| Download linked IdaC workbook | Card strip on the workbook row |
+| Start JIRA polling and LLM analysis | Header **Run Analysis** |
+| Send project metadata to the service | Header **Export Snapshot** |
+| Check service status | Header status indicator |
+| Read LLM outcomes per project | Card **Analysis** panel |
 
-## 2. Open the portal
+## 2. Opening the portal
 
-Use any of these (same UI):
+You may use any of these entry points. The user interface is the same.
 
-* **Local:** `http://localhost:8080/projects.html` (or the port your static server uses).
-* **Internal / hosted:** your organisation’s draw.io deployment (for example an internal hostname or `*.vercel.app` preview).
+* **Web application:** the HTTPS URL where `projects.html` is served (for example `https://portal.example.org/projects.html`).
+* **Hosted:** your internal draw.io deployment URL supplied by IT.
 
-### Pointing the portal at the analysis service
+### Connecting the portal to the analysis service
 
-The portal script uses a **service base URL** (in code this is `SERVICE_URL`, typically `http://localhost:3001` during development). For production:
+Assume the **service** Node application runs on a real host with an HTTPS base URL, for example `https://analysis.internal.example.com`, and that the **static web deployment** exposes the portal and **LLM Analysis** with scripts configured to use that same API base URL for every call.
 
-1. Run the Node **`service/`** on the **internal device** that can reach JIRA and the LLM API.
-2. Set the portal’s base URL to that host (e.g. `https://analysis-internal.example.gov:3001`) — configure in your deployment branch (`projects.html` or build-time injection) so **Export Snapshot**, **Run Analysis**, **JIRA search**, **ARB update**, and **status** all hit the same origin you trust.
-3. Ensure **CORS** on the service allows the portal’s origin (`GET`/`POST` on `/api/*`).
+1. Run **`service`** where it can reach JIRA and the LLM API.
+2. Publish it on TLS with a hostname browsers can resolve per your security model.
+3. Configure the front-end build or publish step so the injected **service base URL** matches that hostname. Then **Export Snapshot**, **Run Analysis**, JIRA helpers, ARB updates, status checks, and chat all target one API origin.
+4. On the API host, allow the **`Origin`** of the static web UI in CORS for the **`GET`** and **`POST`** routes under `/api` that the portal uses.
 
-> Tip: All portal **project metadata and linked files** stay in the browser (`localStorage`, key `hkma.projects`). Export Snapshot regularly so the service can correlate JIRA issues to projects and ARB keys.
+For local development only, the same scripts may point at `http://localhost:3001` or another loopback URL.
+
+Project metadata and linked binaries stay in the browser under `localStorage` key `hkma.projects`. Run **Export Snapshot** after material changes so the service keeps correct correlation between JIRA items, projects, and ARB references.
 
 ## 3. Create or edit a project
 
-1. Click **+ New Project** (or **Edit** on a card).
-2. Fill in the modal:
-   * **Project Name** *(required)* — e.g. `CSP Phase 2`
-   * **Search JIRA projects** — type part of a key or name; pick a row. **Project Code** fills with the JIRA project key (e.g. `CSP`). If the service is offline, type the code manually.
-   * **Search ARB tickets** *(optional)* — find the Architecture Review ticket (e.g. `ARB-2024-031`). The card will show an ARB badge and enable **ARB auto-update** on link.
-   * **Owning Team** — AS1, AS2, ITIS, ITDP, ITPSO, BTG, BSA, ITS, Other.
-   * **Status** — Active / On Hold / Archived.
-   * **People Assigned** — comma-separated names.
-   * **Description** — free text.
-3. Click **Save Project**.
+1. Choose **+ New Project** or **Edit** on a card.
+2. Complete the modal:
+   * **Project Name:** required.
+   * **Search JIRA projects:** pick a row so **Project Code** fills with the JIRA project key. If the service is offline, type the code manually.
+   * **Search ARB tickets:** optional Architecture Review key so the card can show ARB metadata and drive ARB updates on link.
+   * **Owning Team:** AS1, AS2, ITIS, ITDP, ITPSO, BTG, BSA, ITS, or Other.
+   * **Status:** Active, On Hold, or Archived.
+   * **People Assigned:** comma-separated names.
+   * **Description:** free text.
+3. Choose **Save Project**.
 
-Cards sort by status (Active → On Hold → Archived), then newest first.
+Cards sort by status with Active first, then On Hold, then Archived, then by newest update within each group.
 
 ## 4. Link diagrams and IdaC workbook
 
-Each card has two primary link actions:
-
 ### 4.1 Link Diagram
 
-1. Ask the architect for the `.drawio` file ([Architect Guide](./architect-guide.md)).
-2. Click **Link Diagram** on the card.
-3. Choose the file in the OS picker.
-4. The card shows a green strip with **Open in Canvas**, **Download .drawio**, and unlink. Open-in-canvas uses a temporary `localStorage` draft; the canvas loads it via `index.html?openDraft=…`.
+1. Obtain the `.drawio` file from the project team. See the [Project Team Guide](./project-team-guide.md).
+2. Choose **Link Diagram** on the card.
+3. Select the file in the system picker.
+4. The card shows a strip with **Open in Canvas**, **Download .drawio**, and unlink. **Open in Canvas** stores a short-lived draft in `localStorage` and opens `index.html` with a draft key.
 
-If an **ARB ticket** is linked on the project, the service receives **`POST /api/jira/arb-update`** (diagram filename and timestamp). Success toast: *ARB-… updated in JIRA*; failure is non-blocking with a clear message.
+If an ARB ticket is on the project, the service calls **`POST /api/jira/arb-update`** with filenames and timing. Success appears in a toast; failures are non-blocking and explain the error.
 
 ### 4.2 Link IdaC workbook
 
-1. Ask the architect for the **IdaC `.xlsx`** produced from **File → Export firewall (IdaC template)** (firewall rules JSON is used inside the editor for extraction; the **stored** artefact for the portal is the workbook).
-2. Click **Link IdaC workbook**.
-3. Select the `.xlsx`. Invalid files are rejected with a toast.
-4. The card shows a second strip with open/download/unlink for the workbook.
+1. Obtain the IdaC `.xlsx` from **Export firewall** with the IdaC template on the canvas **File** menu.
+2. Choose **Link IdaC workbook**.
+3. Select the `.xlsx`. Invalid files trigger an error toast.
+4. The card shows a second strip with download and unlink for the workbook.
 
-> The analysis service uses project metadata, diagram filename, and IdaC filename for correlation and LLM context. Re-run **Export Snapshot** after material changes.
+Re-run **Export Snapshot** after meaningful edits so correlation and LLM context stay accurate.
 
-## 5. Edit, search, filter
+## 5. Search, filter, edit, delete
 
-* **Edit** on a card → modal with current values (including JIRA/ARB fields).
-* **Delete** → confirmation, then remove the project and its linked blobs from `localStorage`.
-* **Search bar** — name, code, team, members, description.
-* **Status** and **Team** filters — narrow the grid.
+* **Edit:** opens the modal with current values including JIRA and ARB fields when configured.
+* **Delete:** asks for confirmation, then removes the project and its stored attachments from `localStorage`.
+* **Search:** matches name, code, team, members, and description.
+* **Status** and **Team** filters narrow the grid.
 
-The toolbar count shows `X of Y projects` when filters apply.
+The toolbar shows how many projects match when filters apply.
 
-## 6. JIRA poll and LLM analysis (production)
+## 6. JIRA polling and LLM analysis in production
 
 The analysis service:
 
-1. **Polls JIRA** on the configured schedule for open **Firewall Request** issues (JQL configurable; multi-project supported).
-2. **Correlates** each issue to a portal project (project key, tightened fuzzy name match, optional code hints).
-3. **Builds LLM context** including architecture **schema rules** loaded from `service/data/architecture.schema.json` (or API).
-4. **Calls the LLM** using the documented prompt template, with **retries and back-off** on transient failures; surfaces **`llmError`** when analysis could not complete (so you do not mistake a failure for a real “Approved” stub).
-5. **Persists** results for `GET /api/analysis/:projectId`.
+1. **Polls JIRA** on the configured cadence for open firewall request issues. JQL is configurable and may span projects.
+2. **Correlates** each issue to a portal project using project key, name similarity, and optional hints.
+3. **Builds LLM context** including effective architecture rules from the service data path.
+4. **Calls the LLM** with retries on transient errors. Failures surface as **`llmError`** so you do not mistake an outage for approval.
+5. **Stores** results for **`GET /api/analysis/:projectId`**.
 
-### 6.1 Prerequisites (internal device)
+### 6.1 Service setup on the internal host
 
 ```bash
 cd service
-copy .env.example .env    # JIRA_URL, JIRA_USER, JIRA_TOKEN, LLM_URL, LLM_API_KEY, optional JIRA_FIREWALL_JQL
+copy .env.example .env
 npm install
-npm start                   # listens on SERVICE_PORT (default 3001)
+npm start
 ```
 
-Production: **do not** leave `JIRA_URL` or `LLM_URL` blank (that is **stub mode**, three fixture issues — useful only for demos on a laptop).
+Set JIRA URL, credentials, LLM URL, LLM API key, and optional **`JIRA_FIREWALL_JQL`** in `.env`. **`SERVICE_PORT`** is the listen port inside the process and defaults to 3001. Production usually fronts this with a reverse proxy and HTTPS; the port is whatever your image or unit exposes behind that proxy.
+
+Use real JIRA and LLM endpoints in production. Blank JIRA or LLM URLs enable demonstration behaviour with fixture data only on isolated demo machines.
 
 ### 6.2 Export Snapshot
 
-1. Click **Export Snapshot**.
-2. The portal downloads `projects-snapshot.json` and **POST**s the payload to `{SERVICE_URL}/api/projects/sync`.
-3. A toast confirms. If the service is offline, the file still downloads — you can manually place it under `service/data/` on the internal host if needed.
+1. Choose **Export Snapshot**.
+2. The browser downloads `projects-snapshot.json` and **POST**s the trimmed payload to **`/api/projects/sync`**.
+3. A toast confirms delivery. If the service is unreachable, keep the downloaded file for manual placement under `service/data` on the analysis host when your process allows it.
 
-Re-export whenever project codes, ARB keys, or membership change materially.
+Export again when codes, ARB keys, or membership change in ways that matter for routing work.
 
 ### 6.3 Run Analysis
 
-1. Click **Run Analysis**.
-2. The portal calls **`POST /api/run`**. If a poll is already running, the API returns **`{ skipped: true, reason: "…" }`** and the UI can show *Analysis already running…* (no silent second click).
-3. When complete, cards refresh from **`GET /api/analysis/:id`**. The header status pill updates **last run / next run**.
+1. Choose **Run Analysis**.
+2. The portal **POST**s **`/api/run`**. If a run is already in progress, the API may return **`skipped`** and the UI should say so.
+3. When polling finishes, cards refresh from **`GET /api/analysis/:id`**. The header status shows last and next scheduled run.
 
-### 6.4 Read outcomes on each card
+### 6.4 Reading card outcomes
 
 | Indicator | Meaning |
 |---|---|
-| **Approved** (green) | LLM + schema context indicate the request aligns with allow rules. |
-| **Clarification** (amber) | Validation or policy ambiguity — reviewer action. |
-| **Pending** (blue) | Default path — manual review. |
-| **Warning / LLM error** | LLM unavailable after retries — not a silent stub; retry or check service logs. |
+| **Approved** | LLM and schema context support allowing the request. |
+| **Clarification** | Ambiguity or policy gap needs reviewer input. |
+| **Pending** | Default path pending human review. |
+| **LLM error** | The model path failed after retries; check logs and retry. |
 
-Stub/demo mode still appends a small *(stub)* hint on timestamps when enabled.
+Demonstration stacks may annotate analysis timestamps when results are illustrative.
 
 ## 7. Common workflows
 
-### Workflow A — new architecture package from an architect
+### Workflow A: New package from an architect
 
-1. Receive `csp-phase2.drawio` and `csp-phase2-…-idac.xlsx`.
-2. Create or open the project; use **JIRA search** to bind **CSP** and optional **ARB-…**.
+1. Receive the `.drawio` and matching IdaC `.xlsx`.
+2. Create or open the project. Use JIRA search to bind the project key and optional ARB ticket.
 3. **Link Diagram** and **Link IdaC workbook**.
-4. Confirm ARB toast (JIRA updated).
-5. **Open in Canvas** for a quick sanity check.
-6. **Export Snapshot** → **Run Analysis** → review the analysis strip.
+4. Confirm ARB update toast if applicable.
+5. **Open in Canvas** for a quick review if needed.
+6. **Export Snapshot**, then **Run Analysis**, then read each **Analysis** strip.
 
-### Workflow B — daily triage
+### Workflow B: Daily triage
 
-1. Open the portal; confirm the header **status** is **Online**.
+1. Open the portal. Confirm status shows the service online.
 2. Filter **Active** projects.
-3. For each **Clarification** row, open JIRA from the issue key, inspect the IdaC row, add comments as needed.
+3. For each **Clarification** item, open the JIRA issue, inspect the workbook row, and add comments as your process requires.
 
-### Workflow C — onboard a new BTG admin
+### Workflow C: Onboard a new BTG administrator
 
 1. Share this guide and the [Screenshots Walkthrough](./screenshots-walkthrough.md).
-2. Walk through a sandbox project with **stub mode** on a laptop (optional).
-3. Repeat on the **internal device** with read-only JIRA and a single test issue before turning on comment posting (`POST_JIRA_COMMENTS`).
+2. Practice on a laptop demo stack if your organisation provides one.
+3. Move to the internal analysis host with read-only JIRA and a single test issue before enabling comment posting to JIRA.
 
 ## 8. Troubleshooting
 
-| Symptom | Likely cause | Fix |
+| Symptom | Likely cause | What to try |
 |---|---|---|
-| Header shows **offline** | Service down, wrong `SERVICE_URL`, or network | Start `service/`; fix URL / VPN / CORS |
-| JIRA search dropdown empty | Auth failure or JIRA API blocked | Check `.env` token and enterprise firewall |
-| **Run Analysis** appears to do nothing | Second click while poll running | Read toast / status pill for **skipped** |
-| Analysis text shows **LLM error** | Endpoint timeout or 429 after retries | Check LLM quota and logs; retry |
-| ARB update toast failed | `arbJiraKey` invalid or JIRA permission | Verify ticket exists; check write scope |
-| Linked diagram opens empty canvas | Draft key consumed | Click **Open in Canvas** again |
-| IdaC link rejected | Wrong file type or corrupt xlsx | Re-export IdaC template from canvas |
-| No cards after save | `localStorage` blocked | Browser privacy settings |
+| Status offline | Service stopped, wrong URL, or network | Start **`service`**, verify URL, VPN, and CORS |
+| JIRA search empty | Auth failure or API block | Verify token and enterprise firewall rules |
+| **Run Analysis** appears idle | Duplicate trigger while a run is active | Read toast and status for **skipped** |
+| **LLM error** text | Timeout or quota after retries | Check LLM logs and capacity |
+| ARB toast shows failure | Invalid key or missing write permission | Verify ticket id and service account scope |
+| Canvas opens blank | Draft key already consumed | Choose **Open in Canvas** again |
+| IdaC rejected | Wrong type or corrupted file | Re-export from the canvas |
+| No cards after save | Browser blocked storage | Adjust privacy settings |
 
-## 9. Where data lives
+## 9. Where data is stored
 
-Field names for **ARB / JIRA search** follow your shipped `projects.html` and `ProjectStore.js` once those properties are added; until then, treat ARB and JIRA picker rows as described in [Phase 5 implementation plan](../PHASE5-IMPLEMENTATION-PLAN.md).
-
-| Data | Location |
+| Data | Storage |
 |---|---|
-| Project records | Browser `localStorage`: key `hkma.projects` |
-| Linked diagram XML | Same record (`diagramXml`, etc.) |
-| Linked IdaC workbook | Same record (`firewallIdacXlsxBase64`, filename, timestamps) |
-| ARB / JIRA linkage | On project record (keys such as `arbJiraKey` / `arbJiraUrl` when the modal ships them) |
-| Open-in-canvas drafts (transient) | `localStorage`: keys `hkma.opendraft.*` |
-| Snapshot on server | `service/data/projects-snapshot.json` |
-| Analysis results | `service/data/analysis-results.json` |
-| Per-page schema overrides (canvas) | `localStorage` + `.drawio` page attribute |
+| Project records | Browser `localStorage` key `hkma.projects` |
+| Linked diagram XML | Inside each project record |
+| Linked IdaC workbook | Inside each project record as Base64 plus filename and timestamps |
+| ARB and JIRA linkage fields | On each project record per your shipped portal build |
+| Open-in-canvas drafts | `localStorage` keys prefixed `hkma.opendraft` |
+| Snapshot on the server file system | `service/data/projects-snapshot.json` |
+| Analysis results file | `service/data/analysis-results.json` |
+| Per-diagram schema overrides | `localStorage` and attributes inside the `.drawio` file |
 
-## 10. Next steps
+Field names on each project record match the portal build your organisation deploys.
 
-* [Screenshots Walkthrough](./screenshots-walkthrough.md) — visuals for portal and canvas, including **29–31** for integrated JIRA/LLM UI.
-* [Architect Guide](./architect-guide.md) — diagram and IdaC export for architects.
-* [Phase 5 implementation plan](../PHASE5-IMPLEMENTATION-PLAN.md) — engineering backlog and endpoint checklist (for developers).
+## 10. Related material
+
+* [Screenshots Walkthrough](./screenshots-walkthrough.md) for captioned figures across portal, LLM chat, canvas, and firewall panel.
+* [Project Team Guide](./project-team-guide.md) for diagram and IdaC production.
+* [Reviewer Guide](./reviewer-guide.md) for LLM assisted conversational review.

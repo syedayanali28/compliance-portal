@@ -8,6 +8,13 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
   <script src="js/diagramly/architecture/ProjectStore.js"></script>
+  <script src="js/hkma-demo-mode.js"></script>
+  <script>
+    document.documentElement.classList.toggle(
+      'hkma-demo-mode',
+      typeof HKMA_getDemoMode === 'function' && HKMA_getDemoMode()
+    );
+  </script>
   <script src="js/vendor/jszip.min.js"></script>
   <script src="js/diagramly/architecture/FirewallIdacXlsx.js"></script>
   <link rel="stylesheet" href="styles/hkma-app-nav.css">
@@ -324,6 +331,15 @@
       flex-wrap: wrap;
       align-items: center;
     }
+    .card-actions .btn-jira {
+      background: #0052cc;
+      color: #fff;
+      border-color: #0052cc;
+    }
+    .card-actions .btn-jira:hover {
+      background: #0047b3;
+      border-color: #0047b3;
+    }
     .spacer { flex: 1; }
 
     /* ── Analysis Panel ── */
@@ -509,18 +525,34 @@
     }
     .confirm-box p { font-size: 14px; color: var(--text); margin-bottom: 20px; line-height: 1.5; }
     .confirm-box .actions { display: flex; gap: 10px; justify-content: center; }
+    .demo-mode-banner {
+      display: none;
+      background: #fff8e6;
+      border-bottom: 1px solid #e6d9a8;
+      padding: 8px 24px;
+      font-size: 13px;
+      color: #5c4a00;
+      line-height: 1.45;
+    }
+    html.hkma-demo-mode .demo-mode-banner { display: block; }
   </style>
 </head>
 <body>
 
 <nav class="hkma-menubar-strip" aria-label="HKMA navigation">
   <div class="hkma-menubar-strip-inner">
-    <a class="hkma-ge-item" href="index.html" target="_blank" rel="noopener">Editor</a>
+    <a class="hkma-ge-item" href="index.html" target="_blank" rel="noopener">Canvas</a>
     <a class="hkma-ge-item" href="firewall-rules-panel.html" target="_blank" rel="noopener">Firewall Rules Panel</a>
     <a class="hkma-ge-item hkma-ge-item--active" href="projects.html" aria-current="page">Projects Portal</a>
-    <a class="hkma-ge-item" href="firewall-rules-panel.html#validation-section" target="_blank" rel="noopener">Validation rules</a>
+    <a class="hkma-ge-item" href="llm-analysis.html">Reviewer workspace</a>
   </div>
 </nav>
+
+<div class="demo-mode-banner" role="status">
+  <strong>Client demo mode</strong> — Jira and analysis calls are simulated in the browser (default on hosted deploys).
+  On <code>http://localhost</code> demo is <strong>off</strong> so you can use the real Node service on port 3001.
+  To toggle: <code>?demo=0</code> / <code>?demo=1</code> or <code>localStorage.hkmaDemoMode</code> = <code>"false"</code> / <code>"true"</code>.
+</div>
 
 <!-- Header -->
 <div class="header">
@@ -529,8 +561,6 @@
     <span class="badge">BTG Admin</span>
   </div>
   <div class="header-actions">
-    <button class="btn btn-secondary" id="exportSnapshotBtn" title="Download hkma.projects as JSON and push to the analysis service">&#128229; Export Snapshot</button>
-    <button class="btn btn-secondary" id="runAnalysisBtn" title="Trigger the JIRA firewall poller on the analysis service">&#9654; Run Analysis</button>
     <button class="btn btn-primary" id="newProjectBtn">+ New Project</button>
   </div>
 </div>
@@ -639,6 +669,18 @@
 <script>
 (function() {
   'use strict';
+
+  /** Dev/docs: `projects.html?cleardata=1` clears portal localStorage once, then drops the param. */
+  try {
+    var qs = new URLSearchParams(window.location.search);
+    if (qs.get('cleardata') === '1') {
+      localStorage.removeItem('hkma.projects');
+      qs.delete('cleardata');
+      var nextQs = qs.toString();
+      var nextUrl = window.location.pathname + (nextQs ? '?' + nextQs : '') + window.location.hash;
+      window.history.replaceState({}, '', nextUrl);
+    }
+  } catch (e) { /* ignore */ }
 
   var store = window.HKMAProjectStore;
 
@@ -948,6 +990,8 @@
         render();
         showToast('Diagram unlinked.', 'info');
       });
+    } else if (action === 'prompt-arb-link') {
+      promptArbLink(id);
     } else if (action === 'unlink-firewall') {
       showConfirm('Remove the linked IdaC workbook from this project?', function() {
         var p = store.getById(id);
@@ -1126,75 +1170,98 @@
     });
   }
 
-  // ── Export Snapshot button ─────────────────────────────
-  function exportProjectsSnapshot() {
-    var projects = store.getAll();
-    // Strip bulky diagram XML from the snapshot to keep the file small.
-    // The service only needs identity/firewall data for correlation.
-    var snapshot = projects.map(function(p) {
-      return {
-        id:              p.id,
-        name:            p.name,
-        code:            p.code,
-        team:            p.team,
-        status:          p.status,
-        members:         p.members,
-        description:     p.description,
-        firewallIdacFilename: p.firewallIdacFilename || null,
-        diagramFilename: p.diagramFilename || null,
-        linkedAt:        p.linkedAt       || null,
-        firewallLinkedAt: p.firewallLinkedAt || null,
-        createdAt:       p.createdAt      || null,
-      };
-    });
+  // ── Link to Jira / ARB Button ─────────────────────────────
+  function promptArbLink(id) {
+    var p = store.getById(id);
+    if (!p) return;
 
-    // Always download locally
-    downloadJson(snapshot, 'projects-snapshot.json');
+    var arbTicketId = window.prompt("Enter the JIRA Architecture Review (ARB) ticket key for this project to update its description with links to these artefacts:\n\ne.g. ARB-2024-031");
+    if (!arbTicketId) return;
 
-    // Best-effort push to the service (silently ignored if offline)
-    fetch(SERVICE_URL + '/api/projects/sync', {
+    // Send payload to analysis service which wraps JIRA calls
+    var payload = {
+      arbJiraKey: arbTicketId,
+      projectName: p.name,
+      drawioFileName: p.diagramFilename,
+      firewallFileName: p.firewallIdacFilename
+    };
+
+    fetch(SERVICE_URL + '/api/jira/arb-update', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(snapshot),
+      body:    JSON.stringify(payload),
     })
     .then(function(res) {
-      if (res.ok) {
-        showToast('Snapshot exported and pushed to analysis service (' + snapshot.length + ' projects).', 'success');
-      } else {
-        showToast('Snapshot downloaded. Service returned HTTP ' + res.status + '.', 'info');
-      }
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return res.json();
     })
-    .catch(function() {
-      showToast('Snapshot downloaded. Service is offline — drop the file into service/data/ manually.', 'info');
+    .then(function(data) {
+      showToast('Jira updated! Ticket ' + arbTicketId + ' description modified.', 'success');
+    })
+    .catch(function(err) {
+      showToast('Failed to update Jira ARB ticket. service/ might be down.', 'error');
     });
   }
 
-  // ── Run Analysis button ─────────────────────────────────
-  function triggerRunAnalysis() {
-    var btn = document.getElementById('runAnalysisBtn');
-    if (btn) { btn.disabled = true; btn.textContent = 'Running\u2026'; }
+  // Handle grid button clicks via event delegation
+  document.getElementById('projectGrid').addEventListener('click', function(e) {
+    var btn = e.target.closest('button[data-action]');
+    if (!btn) return;
+    
+    var action = btn.getAttribute('data-action');
+    var id = btn.getAttribute('data-id');
+    var p = store.getById(id);
+    
+    if (!p) return;
 
-    fetch(SERVICE_URL + '/api/run', { method: 'POST' })
-      .then(function(res) {
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        return res.json();
-      })
-      .then(function() {
-        showToast('Analysis triggered! Results will appear on cards in a few seconds.', 'info');
-        // Reload analysis panels after a short delay to give the poller time to finish
-        setTimeout(function() {
-          loadAllAnalysis();
-          if (btn) { btn.disabled = false; btn.innerHTML = '&#9654; Run Analysis'; }
-        }, 4000);
-      })
-      .catch(function() {
-        showToast('Analysis service is offline. Start service/ and try again.', 'error');
-        if (btn) { btn.disabled = false; btn.innerHTML = '&#9654; Run Analysis'; }
+    if (action === 'open-diagram') openDiagramInCanvas(p);
+    else if (action === 'dl-diagram') {
+      var blob = new Blob([p.diagramXml], { type: 'application/xml' });
+      downloadBlob(blob, p.diagramFilename || 'diagram.drawio');
+    }
+    else if (action === 'unlink-diagram') {
+      if (!confirm('Unlink the architecture diagram from ' + p.name + '?')) return;
+      delete p.diagramXml;
+      delete p.diagramFilename;
+      delete p.linkedAt;
+      store.update(p);
+      render();
+    }
+    else if (action === 'prompt-diagram') {
+      pickDrawioFile(function(filename, xml) {
+        if (!xml) return;
+        p.diagramFilename = filename;
+        p.diagramXml = xml;
+        p.linkedAt = new Date().toISOString();
+        store.update(p);
+        showToast('Diagram "' + filename + '" linked successfully.', 'success');
+        render();
+        loadAnalysisForProject(p);
       });
-  }
-
-  document.getElementById('exportSnapshotBtn').addEventListener('click', exportProjectsSnapshot);
-  document.getElementById('runAnalysisBtn').addEventListener('click', triggerRunAnalysis);
+    }
+    else if (action === 'prompt-firewall') {
+      pickXlsxFile(function(filename, base64) {
+        p.firewallIdacFilename = filename;
+        p.firewallIdacXlsxBase64 = base64;
+        p.firewallIdacText = '[Encoded XLSX]'; 
+        p.firewallLinkedAt = new Date().toISOString();
+        store.update(p);
+        showToast('Rule sheet "' + filename + '" linked successfully.', 'success');
+        render();
+        loadAnalysisForProject(p);
+      });
+    }
+    else if (action === 'dl-firewall') dlIdac(p);
+    else if (action === 'prompt-arb-link') promptArbLink(id);
+    else if (action === 'edit') openEditModal(id);
+    else if (action === 'delete') {
+      if (confirm('Are you sure you want to delete "' + p.name + '"?')) {
+        store.remove(id);
+        showToast('Project deleted', 'info');
+        render();
+      }
+    }
+  });
 
   // ── Modal helpers ──────────────────────────────────────
   function openModal(title) {

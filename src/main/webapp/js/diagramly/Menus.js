@@ -5914,7 +5914,7 @@
 	};
 
 	/**
-	 * HKMA: "Firewall Rules Panel" and "Projects Portal" as direct menubar controls.
+	 * HKMA: "Firewall Rules Panel", "Projects Portal", and "LLM Analysis" as direct menubar controls.
 	 */
 	function appendFirewallRulesPanelToMenubar(editorUi, menubarContainer)
 	{
@@ -6007,6 +6007,50 @@
 		}
 	}
 
+	/**
+	 * HKMA: "LLM Analysis" menubar link (same strip as File, Edit, …).
+	 */
+	function appendLlmAnalysisToMenubar(editorUi, menubarContainer)
+	{
+		if (menubarContainer == null)
+		{
+			return;
+		}
+
+		var prevLlm = menubarContainer.querySelector('[data-hkma-llm-analysis="1"]');
+
+		if (prevLlm != null)
+		{
+			prevLlm.parentNode.removeChild(prevLlm);
+		}
+
+		var btnLlm = document.createElement('a');
+		btnLlm.setAttribute('data-hkma-llm-analysis', '1');
+		btnLlm.className = 'geItem';
+		btnLlm.setAttribute('href', 'javascript:void(0);');
+		btnLlm.style.cursor = 'pointer';
+		btnLlm.style.flexShrink = '0';
+		btnLlm.style.whiteSpace = 'nowrap';
+		mxUtils.write(btnLlm, 'Reviewer');
+
+		mxEvent.addListener(btnLlm, 'click', function(evt)
+		{
+			window.open('llm-analysis.html', '_blank');
+			mxEvent.consume(evt);
+		});
+
+		var sc = (editorUi != null) ? editorUi.statusContainer : null;
+
+		if (sc != null && sc.parentNode === menubarContainer)
+		{
+			menubarContainer.insertBefore(btnLlm, sc);
+		}
+		else
+		{
+			menubarContainer.appendChild(btnLlm);
+		}
+	}
+
 	var menusCreateMenubarBaseHKMA = Menus.prototype.createMenubar;
 
 	Menus.prototype.createMenubar = function(container)
@@ -6025,6 +6069,7 @@
 
 			appendFirewallRulesPanelToMenubar(ui, mb.container);
 			appendProjectPortalToMenubar(ui, mb.container);
+			appendLlmAnalysisToMenubar(ui, mb.container);
 		});
 
 		refreshPortal();
@@ -6041,4 +6086,5 @@
 
 	Menus.hkmaAppendFirewallRulesPanelToMenubar = appendFirewallRulesPanelToMenubar;
 	Menus.hkmaAppendProjectsPortalToMenubar = appendProjectPortalToMenubar;
+	Menus.hkmaAppendLlmAnalysisToMenubar = appendLlmAnalysisToMenubar;
 })();

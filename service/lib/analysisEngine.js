@@ -4,7 +4,100 @@ const { analyseFirewallRequest }  = require('../clients/llmClient');
 const { postComment }             = require('../clients/jiraClient');
 const { findMatchingFirewallRow } = require('./projectCorrelator');
 const { getFirewallRows }         = require('./firewallRowsFromProject');
-const config                      = require('../config');
+const config = require('../config');
+const fs                          = require('fs');
+const path                        = require('path');
+
+function jiraBrowseUrl(issueKey) {
+  const base = (config.jira.url || '').replace(/\/$/, '');
+  return base ? `${base}/browse/${issueKey}` : null;
+}
+
+/**
+ * Links reviewers see alongside an analysis (Jira, ARB, portal artefacts, pasted URLs).
+ * @param {string} issueKey
+ * @param {object|null} project
+ * @param {object} reviewerMeta
+ * @returns {Array<{ label: string, type: string, url: string|null, note?: string }>}
+ */
+function buildSourceDocuments(issueKey, project, reviewerMeta = {}) {
+  const docs = [];
+  const ju = jiraBrowseUrl(issueKey);
+  if (ju) {
+    docs.push({ label: `Firewall request ${issueKey}`, type: 'jira', url: ju });
+  } else {
+    docs.push({
+      label: `Firewall request ${issueKey}`,
+      type: 'jira',
+      url: null,
+      note: 'Set JIRA_BASE_URL on the analysis service for clickable Jira links.',
+    });
+  }
+
+  if (reviewerMeta.linkedArbKey) {
+    const arbUrl = reviewerMeta.linkedArbUrl || jiraBrowseUrl(reviewerMeta.linkedArbKey);
+    docs.push({ label: `ARB ${reviewerMeta.linkedArbKey}`, type: 'jira', url: arbUrl });
+  }
+
+  if (project && project.diagramFilename) {
+    docs.push({
+      label: project.diagramFilename,
+      type: 'diagram',
+      url: null,
+      note: 'Linked in Projects Portal — snapshot sync sends diagram XML to the analysis service.',
+    });
+  }
+
+  if (project && project.firewallIdacFilename) {
+    docs.push({
+      label: project.firewallIdacFilename,
+      type: 'idac',
+      url: null,
+      note: 'IdaC workbook linked in Projects Portal.',
+    });
+  }
+
+  const extra = reviewerMeta.additionalLinks;
+  if (Array.isArray(extra)) {
+    for (const l of extra) {
+      if (l && l.url && l.label) {
+        docs.push({ label: l.label, type: 'other', url: l.url });
+      }
+    }
+  }
+
+  return docs;
+}
+
+function defaultConfidenceForOutcome(outcome) {
+  return (
+    {
+      likely_approved: 82,
+      requires_clarification: 30,
+      pending_review: 55,
+    }[outcome] ?? 55
+  );
+}
+
+let preloadedSchemaRules = null;
+function loadSchemaRules() {
+  if (preloadedSchemaRules) return preloadedSchemaRules;
+  try {
+    const schemaPath = path.join(__dirname, '../../src/main/webapp/schemas/architecture.schema.json');
+    if (fs.existsSync(schemaPath)) {
+      const raw = fs.readFileSync(schemaPath, 'utf8');
+      const schema = JSON.parse(raw);
+      preloadedSchemaRules = {
+        edgeRules: schema.rules && schema.rules.edgeRules ? schema.rules.edgeRules : [],
+        firewallRules: schema.firewallRules && schema.firewallRules.rules ? schema.firewallRules.rules : []
+      };
+      return preloadedSchemaRules;
+    }
+  } catch (err) {
+    console.error('[analysisEngine] Failed to read architecture.schema.json', err.message);
+  }
+  return {};
+}
 
 /**
  * Build the LLM context payload for a single JIRA issue.
@@ -32,7 +125,7 @@ function buildContext(issue, project, firewallRow) {
       destZone:        issue.fields.customfield_destZone        || '',
     },
     projectDiagramRules,
-    schemaRules: {},   // TODO: load schema when service has access to architecture.schema.json
+    schemaRules: loadSchemaRules(),
     matchedFirewallRow: firewallRow,
   };
 }
@@ -45,9 +138,15 @@ function buildContext(issue, project, firewallRow) {
  * @param {object|null} firewallRow
  * @param {object} llmResult  Response from llmClient.analyseFirewallRequest
  * @param {object|null} jiraComment  Comment posted to JIRA, or null
+ * @param {object} [reviewerMeta]  linkedArbKey, linkedArbUrl, reviewerNotes, additionalLinks
  * @returns {object}
  */
-function buildResultRecord(issue, project, firewallRow, llmResult, jiraComment) {
+function buildResultRecord(issue, project, firewallRow, llmResult, jiraComment, reviewerMeta = {}) {
+  const confidencePercent =
+    typeof llmResult.confidencePercent === 'number'
+      ? llmResult.confidencePercent
+      : defaultConfidenceForOutcome(llmResult.outcome);
+
   return {
     analysedAt:           new Date().toISOString(),
     jiraKey:              issue.key,
@@ -60,6 +159,12 @@ function buildResultRecord(issue, project, firewallRow, llmResult, jiraComment) 
     analysis:             llmResult.analysis,
     evidenceRuleIds:      llmResult.evidenceRuleIds || [],
     reviewers:            llmResult.reviewers       || [],
+    confidencePercent,
+    reasoningSteps:       llmResult.reasoningSteps || [],
+    linkedArbKey:         reviewerMeta.linkedArbKey || null,
+    linkedArbUrl:         reviewerMeta.linkedArbUrl || null,
+    reviewerNotes:        reviewerMeta.reviewerNotes || null,
+    sourceDocuments:      buildSourceDocuments(issue.key, project, reviewerMeta),
     jiraIssue: {
       key:         issue.key,
       summary:     issue.fields.summary || '',
@@ -73,6 +178,7 @@ function buildResultRecord(issue, project, firewallRow, llmResult, jiraComment) 
     matchedFirewallRow:   firewallRow  || null,
     jiraCommentPosted:    !!jiraComment,
     jiraCommentId:        jiraComment ? (jiraComment.id || null) : null,
+    llmError:             llmResult.llmError || false,
   };
 }
 
@@ -86,9 +192,10 @@ function buildResultRecord(issue, project, firewallRow, llmResult, jiraComment) 
  *
  * @param {object} issue
  * @param {object|null} project
+ * @param {object} [reviewerMeta] Optional ARB / notes / extra doc links for the dashboard.
  * @returns {Promise<object>} Result record
  */
-async function analyseIssue(issue, project) {
+async function analyseIssue(issue, project, reviewerMeta = {}) {
   const firewallRow = project ? findMatchingFirewallRow(issue, project) : null;
   const context     = buildContext(issue, project, firewallRow);
 
@@ -106,7 +213,7 @@ async function analyseIssue(issue, project) {
     }
   }
 
-  return buildResultRecord(issue, project, firewallRow, llmResult, jiraComment);
+  return buildResultRecord(issue, project, firewallRow, llmResult, jiraComment, reviewerMeta);
 }
 
 /**

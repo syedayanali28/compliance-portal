@@ -10,6 +10,7 @@ const { writeResults }  = require('../lib/resultStore');
 let _running = false;
 let _lastRun = null;
 let _lastResult = null;
+let _cronJob = null;
 
 /**
  * Execute one full poll cycle:
@@ -23,7 +24,7 @@ let _lastResult = null;
 async function runPoll() {
   if (_running) {
     console.log('[poller] Poll already in progress — skipping');
-    return { count: 0, results: [], skipped: true };
+    return { count: 0, results: [], skipped: true, reason: "already running" };
   }
 
   _running = true;
@@ -64,7 +65,7 @@ function schedulePoll() {
   }
 
   console.log(`[poller] Scheduling cron: "${expr}"`);
-  cron.schedule(expr, () => {
+  _cronJob = cron.schedule(expr, () => {
     console.log('[poller] Cron triggered');
     runPoll().catch((err) => console.error('[poller] Unhandled cron error:', err.message));
   });
@@ -74,9 +75,20 @@ function schedulePoll() {
  * Return a summary of the last run (for health/status endpoints).
  */
 function getStatus() {
+  let nextDate = null;
+  if (_cronJob) {
+    try {
+      // Very naive next execution time for UI display when node-cron doesn't expose it properly across versions
+      nextDate = `Scheduled based on cron: ${config.poll.cron}`;
+    } catch (e) {
+      // Ignored
+    }
+  }
+
   return {
     running:    _running,
     lastRun:    _lastRun,
+    nextRun:    nextDate,
     lastResult: _lastResult,
     stubMode: {
       jira: config.jira.stubMode,

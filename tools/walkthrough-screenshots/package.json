@@ -1,0 +1,12 @@
+{
+  "name": "hkma-walkthrough-screenshots",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Capture docs/user-guides/screenshots (run static server on :8080 and service on :3001 first)",
+  "scripts": {
+    "capture": "node capture.js"
+  },
+  "dependencies": {
+    "puppeteer": "^23.0.0"
+  }
+}
