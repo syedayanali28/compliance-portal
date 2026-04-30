@@ -7,7 +7,7 @@
     var hint = document.getElementById('analysisConnectivityHint');
     if (!hint || !window.HKMA_getDemoMode || !window.HKMA_getDemoMode()) return;
     hint.innerHTML =
-      '<strong>Client demo mode</strong> — <strong>Test Jira and LLM</strong> shows simulated success. To use a real service, open this app on <code>http://localhost</code> (demo defaults off there), run <code>npm start</code> in <code>service/</code>, and configure Jira + LLM in <code>service/.env</code>, or set <code>localStorage.hkmaDemoMode = &quot;false&quot;</code> on this host.';
+      '<strong>Client demo mode</strong> — <strong>Test Jira and LLM</strong> shows simulated success. For a real service, run <code>npm start</code> in <code>service/</code>, set Jira + LLM in <code>service/.env</code>, then set <code>localStorage.hkmaDemoMode = &quot;false&quot;</code> or open with <code>?demo=0</code>.';
   }
   applyDemoConnectivityCopy();
 

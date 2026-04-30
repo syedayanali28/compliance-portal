@@ -549,9 +549,7 @@
 </nav>
 
 <div class="demo-mode-banner" role="status">
-  <strong>Client demo mode</strong> — Jira and analysis calls are simulated in the browser (default on hosted deploys).
-  On <code>http://localhost</code> demo is <strong>off</strong> so you can use the real Node service on port 3001.
-  To toggle: <code>?demo=0</code> / <code>?demo=1</code> or <code>localStorage.hkmaDemoMode</code> = <code>"false"</code> / <code>"true"</code>.
+  <strong>Client demo mode (default)</strong> — Jira and analysis calls are simulated in the browser; fine for Vercel without the Node service. For the real API on port 3001: <code>?demo=0</code> or <code>localStorage.hkmaDemoMode = &quot;false&quot;</code>, then reload.
 </div>
 
 <!-- Header -->

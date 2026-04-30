@@ -30,7 +30,7 @@
 
 <div class="page-wrap">
   <div class="demo-mode-banner" role="status">
-    <strong>Client demo mode</strong> — Jira search, analysis, chat, and health probes are simulated in the browser on hosted URLs. <code>http://localhost</code> defaults to the real API on port 3001. Toggle with <code>?demo=0</code> / <code>?demo=1</code> or <code>localStorage.hkmaDemoMode</code>.
+    <strong>Client demo mode (default)</strong> — Jira, analysis, and chat are simulated in the browser so Vercel and local static hosting work without the Node service. For real API calls: <code>localStorage.hkmaDemoMode = &quot;false&quot;</code> or <code>?demo=0</code>, then run <code>service/</code> on port 3001.
   </div>
 
   <div class="sticky-subnav">

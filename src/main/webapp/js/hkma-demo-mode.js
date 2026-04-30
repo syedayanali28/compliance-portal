@@ -5,11 +5,10 @@
  *  1) URL query: ?demo=1|true|on  → demo ON; ?demo=0|false|off  → demo OFF
  *  2) localStorage "hkmaDemoMode": "true"|"1" or "false"|"0"
  *  3) window.HKMA_DEMO_MODE === true or false (set in HTML before this script to force)
- *  4) Default: demo OFF on localhost / 127.0.0.1 / [::1]; demo ON everywhere else (e.g. Vercel)
+ *  4) Default: demo ON (including localhost and Vercel) so static deploys always simulate Jira/LLM without the Node service.
  *
- * Local development against real Jira/LLM: use http://localhost — demo stays off automatically.
- * To force demo ON locally: ?demo=1 or localStorage.hkmaDemoMode = "true"
- * To force demo OFF on Vercel: ?demo=0 or localStorage.hkmaDemoMode = "false"
+ * Real Jira/LLM (local or any host): set localStorage.hkmaDemoMode = "false" or open with ?demo=0 (persists until you clear storage / change param).
+ * Optional: force demo off in HTML with <script>window.HKMA_DEMO_MODE = false;</script> before this file.
  */
 (function (global) {
   'use strict';
@@ -33,9 +32,7 @@
     if (global.HKMA_DEMO_MODE === true) return true;
     if (global.HKMA_DEMO_MODE === false) return false;
 
-    var h = (global.location.hostname || '').toLowerCase();
-    var isLocal = h === 'localhost' || h === '127.0.0.1' || h === '[::1]';
-    return !isLocal;
+    return true;
   }
 
   global.HKMA_getDemoMode = getDemoMode;
@@ -123,7 +120,7 @@
       outcome: 'likely_approved',
       requiresClarification: false,
       analysis:
-        '[Client demo mode] Illustrative validity narrative. Run the Node analysis service with Jira and LLM credentials for real results; use ?demo=0 on this host or localStorage.hkmaDemoMode="false" to call a live API from a static deploy.',
+        '[Client demo mode] Illustrative validity narrative. For real Jira and LLM, run the Node service and set localStorage.hkmaDemoMode = "false" or use ?demo=0.',
       reasoningSteps: [
         'Demo: compared ticket metadata with portal context (simulated).',
         'Demo: no blocking validation flags in this sample.',
@@ -187,7 +184,7 @@
 
     if (url.indexOf('/api/chat') !== -1 && method === 'POST') {
       return chatStreamResponse(
-        '**Client demo mode** — this reply is generated in the browser. For a real model, deploy or run the `service/` app with LLM credentials and use **demo off** (localhost is off by default; on Vercel set `localStorage.hkmaDemoMode = \"false\"` or `?demo=0`). ' +
+        '**Client demo mode** — this reply is generated in the browser. For a real model, run `service/` with LLM credentials and turn demo off: `localStorage.hkmaDemoMode = \"false\"` or `?demo=0`. ' +
           '**Run validity analysis** above is the primary structured review.'
       );
     }
